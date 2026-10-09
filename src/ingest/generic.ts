@@ -44,6 +44,12 @@ export async function buildCase(id: string, files: string[]): Promise<Case> {
         } catch { /* keep as text */ }
       }
       if (ext === ".eml") channel = "email";
+      if (!receivedAt) {
+        const m = text.match(/^(?:Date|Received|Received at|Timestamp)\s*:\s*(.+)$/im);
+        if (m) { const d = new Date(m[1].trim().replace(/\s*\(.*\)$/, "")); if (!Number.isNaN(d.getTime())) receivedAt = d.toISOString(); }
+        const iso = !receivedAt && text.match(/\b(20\d\d-\d\d-\d\dT\d\d:\d\d(?::\d\d)?(?:Z|[+-]\d\d:?\d\d)?)\b/);
+        if (iso) receivedAt = new Date(iso[1]).toISOString();
+      }
       if (ext === ".vtt" || ext === ".srt") channel = "call";
     } else if (FILE_EXT[ext]) {
       attachments.push({ name: path.basename(f), mediaType: FILE_EXT[ext], path: f });

@@ -30,6 +30,12 @@ export function systemPrompt(agent: AgentConfig): string {
 export async function buildCasePack(c: Case, route: Route, ctx: ToolContext, trace: Trace): Promise<string> {
   const flags = c.flags.map((f) => `- ${f.name} (evidence: "${f.evidence}")${f.forcedAction ? ` FORCED: ${f.forcedAction}` : ""}`).join("\n") || "- none";
   let prefetch = "Prefetch skipped.";
+  let policyDocs = "";
+  try {
+    const docs = await ctx.store.list("document", 5);
+    const texts = docs.map((d) => String((d.data as any).text ?? "")).filter((t) => /polic|procedure|rule|authority|sla|guide/i.test(t)).map((t) => t.slice(0, 4000));
+    if (texts.length) policyDocs = `\n## Agency documents in the system of record (these override defaults in your policy)\n${texts.join("\n\n")}\n`;
+  } catch { /* none */ }
   try {
     const p = await prefetchContext(c, ctx.store);
     trace.log("prefetch", { found: p.records.map((r) => `${r.type}/${r.id}`), queries: p.queries, misses: p.misses });
@@ -40,10 +46,10 @@ export async function buildCasePack(c: Case, route: Route, ctx: ToolContext, tra
     : "This case is an inbound event. Work it as the property manager on duty.";
   return `# Case ${c.id}
 Channel: ${c.channel}
-Case time ("now"): ${c.receivedAt ?? "unknown"}
+Case time ("now", UTC): ${c.receivedAt ?? `unknown; use the run reference time ${ctx.now}`}. Write times in messages as Europe/London local time.
 Linked ids: ${JSON.stringify(c.linkedIds)}
 Triage: families=${route.families.join(",")} urgency=${route.urgency} (${route.reasons})
-Flags (deterministic hints; address each one explicitly in your resolution, and say if you judge one to be a false positive):
+Flags (deterministic hints from pattern matching; address each in your work. A flag can be wrong; if so, say why in the decision):
 ${flags}
 
 ${kindNote}
@@ -54,7 +60,7 @@ ${c.structured ? `\n## Structured fields\n${JSON.stringify(c.structured, null, 2
 
 ## System of record
 ${prefetch}
-
+${policyDocs}
 Work the case: verify the records, look up anything else you need, stage the actions you would take, then call submit_resolution once.`;
 }
 

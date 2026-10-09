@@ -30,13 +30,25 @@ const program = new Command()
   .parse();
 const o = program.opts();
 
-/** Cases about the same property run in timestamp order so later cases see earlier state. */
-function groupKey(c: Case): string {
+/**
+ * Cases about the same building run in timestamp order so later cases see earlier state.
+ * Resolution goes through the record store (ids, postcode, address, phone, email -> property -> building).
+ */
+async function groupKey(c: Case, store: Awaited<ReturnType<typeof openStore>>): Promise<string> {
+  const key = (p: { id: string; data: any }) => `bld:${p.data?.building_id ?? p.data?.buildingId ?? p.data?.block_id ?? p.id}`;
   const ids = Object.entries(c.linkedIds).find(([k]) => /propert|address|unit/i.test(k));
-  if (ids) return `id:${ids[1]}`;
-  const pc = c.rawText.match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i);
+  if (ids) { const p = await store.get("properties", ids[1]).catch(() => null); if (p) return key(p as any); return `id:${ids[1]}`; }
+  const terms: string[] = [];
+  const pc = c.rawText.match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i); if (pc) terms.push(pc[1].replace(/\s+/g, " ").toUpperCase());
+  const addr = c.rawText.match(/\b\d{1,4}[a-z]?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Street|Road|Lane|Avenue|Close|Crescent|Gardens|Place|Square|Terrace|Way|Drive|Court|Mews|Grove|Hill|Park|Row|Walk)\b/); if (addr) terms.push(addr[0]);
+  for (const m of c.rawText.matchAll(/\+44\s?\d[\d ]{8,12}\d|[\w.+-]+@[\w-]+\.[\w.-]+/g)) terms.push(m[0]);
+  for (const t of terms.slice(0, 6)) {
+    const rows = await store.search(t, undefined, 8).catch(() => []);
+    const prop = rows.find((r) => /propert/i.test(r.type)); if (prop) return key(prop as any);
+    const ten = rows.find((r) => /tenanc/i.test(r.type)); const pid = ten && ((ten.data as any).property_id ?? (ten.data as any).propertyId);
+    if (pid) { const p = await store.get("properties", String(pid)).catch(() => null); if (p) return key(p as any); }
+  }
   if (pc) return `pc:${pc[1].replace(/\s+/g, "").toUpperCase()}`;
-  const addr = c.rawText.match(/\b\d{1,4}[a-z]?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Street|Road|Lane|Avenue|Close|Crescent|Gardens|Place|Square|Terrace|Way|Drive|Court|Mews|Grove|Hill|Park|Row|Walk)\b/);
   if (addr) return `addr:${addr[0].toLowerCase()}`;
   return `case:${c.id}`;
 }
@@ -63,7 +75,10 @@ async function main() {
   pending.sort((a, b) => rank(a) - rank(b) || String(a.receivedAt ?? "").localeCompare(String(b.receivedAt ?? "")));
   // Group by property: each group runs sequentially in time order; groups run in parallel.
   const groups = new Map<string, Case[]>();
-  for (const c of pending) { const k = o.group === false ? `case:${c.id}` : groupKey(c); groups.set(k, [...(groups.get(k) ?? []), c]); }
+  for (const c of pending) { const k = o.group === false ? `case:${c.id}` : await groupKey(c, store); groups.set(k, [...(groups.get(k) ?? []), c]); }
+  // Reference "now" for cases without a timestamp: the latest timestamp in the batch, never the wall clock.
+  const referenceNow = cases.map((c) => c.receivedAt).filter(Boolean).sort().at(-1) ?? new Date().toISOString();
+  console.log(`groups: ${[...groups.entries()].map(([k, g]) => `${k}(${g.length})`).join(" ")}`);
   for (const g of groups.values()) g.sort((a, b) => String(a.receivedAt ?? "").localeCompare(String(b.receivedAt ?? "")));
   console.log(`cases: ${cases.length}, pending: ${pending.length}, groups: ${groups.size}, concurrency: ${o.concurrency}`);
 
@@ -81,7 +96,7 @@ async function main() {
     }
     const row = await runCase(c, {
       models, outDir, folder, caseTimeoutMs: Number(o.caseTimeout) * 60_000,
-      ctxFor: (cc) => ({ caseId: cc.id, store, failures, now: cc.receivedAt ?? new Date().toISOString(), env: process.env }),
+      ctxFor: (cc) => ({ caseId: cc.id, store, failures, now: cc.receivedAt ?? referenceNow, env: process.env }),
     });
     rows.push(row);
     console.log(`${row.folder}=${row.caseId}: ${row.status} ${row.family ?? ""} ${row.urgency ?? ""} esc=${row.escalation ?? "-"} agent=${row.agent ?? "-"} ${(row.ms / 1000).toFixed(0)}s${row.error ? ` ERROR ${row.error.slice(0, 120)}` : ""}`);

@@ -14,7 +14,7 @@ export function mockModels(): ModelFactory {
       if (!toolNames.includes("submit_resolution")) {
         return { ...base, content: [{ type: "text", text: JSON.stringify({ families: ["maintenance"], urgency: "P1", confidence: 0.9, reasons: "mock route" }) }] };
       }
-      const alreadyStaged = JSON.stringify(opts.prompt).includes("Recorded. Executes after checks pass");
+      const alreadyStaged = JSON.stringify(opts.prompt).includes("Staged, not executed");
       if (!alreadyStaged) {
         return { ...base, finishReason: { unified: "tool-calls", raw: "tool_use" }, content: [
           { type: "tool-call", toolCallId: "c1", toolName: "create_ticket", input: JSON.stringify({ property_id: "P1", title: "Mock ticket", category: "plumbing", urgency: "P1", description: "mock" }) },

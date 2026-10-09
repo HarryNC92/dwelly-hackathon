@@ -13,7 +13,7 @@ const ADDRESS = /\b((?:flat|apartment|unit)\s+\w+,?\s+)?\d{1,4}[a-z]?\s+[A-Z][a-
 const EMAIL = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
 const REF = /\b(?:[A-Z]{1,3}-?\d{2,6})\b/g; // P12, T-0042, TEN-7, WO1234
 
-export async function prefetchContext(c: Case, store: RecordStore, maxRecords = 14): Promise<Prefetch> {
+export async function prefetchContext(c: Case, store: RecordStore, maxRecords = 22): Promise<Prefetch> {
   const queries: string[] = []; const misses: string[] = [];
   const found = new Map<string, Row>();
   const add = (rows: Row[]) => { for (const r of rows) { const k = `${r.type}:${r.id}`; if (!found.has(k) && found.size < maxRecords) found.set(k, r); } };
@@ -37,13 +37,20 @@ export async function prefetchContext(c: Case, store: RecordStore, maxRecords = 
     const rows = await store.search(t, undefined, 5);
     if (rows.length) add(rows); else misses.push(`"${t}" matched nothing`);
   }
-  // 3. Follow one hop: property -> landlord, tenancy, open tickets, certificates (by property id in any field).
+  // 3. Follow one hop: property -> landlord, tenancy, open tickets, certificates, bookings (by property id in any field),
+  //    then the building: sibling properties and their recent tickets, so building-level patterns are visible.
   const propertyRows = [...found.values()].filter((r) => /propert/i.test(r.type));
   for (const p of propertyRows.slice(0, 2)) {
-    const rel = await store.search(p.id, undefined, 12);
+    const rel = await store.search(p.id, undefined, 14);
     add(rel.filter((r) => r.type !== p.type));
     const landlordId = (p.data as any).landlord_id ?? (p.data as any).landlordId;
     if (landlordId) { const ll = await store.search(String(landlordId), undefined, 3); add(ll.filter((r) => /landlord/i.test(r.type))); }
+    const building = (p.data as any).building_id ?? (p.data as any).buildingId ?? (p.data as any).block_id;
+    if (building) {
+      const sib = (await store.search(String(building), undefined, 10)).filter((r) => /propert/i.test(r.type) && r.id !== p.id);
+      add(sib);
+      for (const sp of sib.slice(0, 3)) add((await store.search(sp.id, undefined, 6)).filter((r) => /ticket|booking|work_order|message/i.test(r.type)));
+    }
   }
   return { records: [...found.values()], queries, misses };
 }

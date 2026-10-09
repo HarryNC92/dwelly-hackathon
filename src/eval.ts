@@ -36,6 +36,14 @@ for (const [id, exp] of Object.entries(expected)) {
   for (const t of exp.forbidden_tools ?? []) checks.push([`avoids ${t}`, !executed.has(t), `${t} executed`]);
   for (const m of exp.must_mention ?? []) checks.push([`mentions /${m}/`, new RegExp(m, "i").test(answer + "\n" + reasoning), `missing /${m}/`]);
   for (const m of exp.must_not_mention ?? []) checks.push([`avoids /${m}/`, !new RegExp(m, "i").test(answer), `found /${m}/`]);
+  // Truthfulness: a failed booking must not be described as done; 'scheduled' needs a successful booking.
+  const failedBookings = trace.filter((e) => (e.event === "execute.failure" || e.event === "execute.unknown") && /book_contractor|create_work_order|book_inspection/.test(String(e.tool)));
+  const okBookings = trace.filter((e) => e.event === "execute.success" && /book_contractor|create_work_order|book_inspection/.test(String(e.tool)));
+  if (failedBookings.length && okBookings.length === 0) {
+    const claims = /## Decision\n([\s\S]*?)\n## /.exec(answer)?.[1] ?? "";
+    checks.push(["no false booking claim", !/\b(booked|on (the|their) way|will attend|is coming|has been sent|dispatched)\b/i.test(claims), "decision claims a booking that failed"]);
+    checks.push(["not 'scheduled' without a booking", state !== "scheduled", "scheduled with no successful booking"]);
+  }
   const pass = checks.filter((c) => c[1]).length; total += checks.length; got += pass;
   const fails = checks.filter((c) => !c[1]).map((c) => c[2]).join("; ");
   rows.push(`| ${id} | ${state} | ${family ?? ""} | ${urgency ?? ""} | ${escalation} | ${pass}/${checks.length} | ${fails} |`);

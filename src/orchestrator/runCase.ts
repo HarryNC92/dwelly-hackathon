@@ -4,8 +4,8 @@ import type { Resolution, Route } from "../schemas/resolution.js";
 import { pickAgent, generalist } from "../agents/index.js";
 import { route as routeCase } from "../runtime/router.js";
 import { runAgent, type AgentOutcome } from "../runtime/runAgent.js";
-import { runChecks } from "../runtime/checks.js";
-import { executeStaged } from "../runtime/execute.js";
+import { runChecks, claimCheck } from "../runtime/checks.js";
+import { executeStaged, withdrawPendingComms } from "../runtime/execute.js";
 import { notifyEscalation } from "../runtime/escalate.js";
 import { writeAnswer, type CaseOutput } from "../runtime/write.js";
 import { Trace } from "../runtime/trace.js";
@@ -27,7 +27,7 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseOutput> {
   const ctx = deps.ctxFor(c);
   trace.log("case.start", { channel: c.channel, flags: c.flags.map((f) => f.name), files: c.sourceFiles });
   let route: Route | null = null; let res: Resolution | null = null; let run: CaseRun = { staged: [], control: {} };
-  let agentName: string | undefined; let error: string | undefined; const checks: string[][] = [];
+  let agentName: string | undefined; let error: string | undefined; const checks: string[][] = []; let page: string | undefined;
   try {
     const [r, jev] = await Promise.all([routeCase(c, deps.models, trace), shadowClassify(c.rawText, trace)]);
     route = r;
@@ -69,23 +69,42 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseOutput> {
           if (!run.staged.some((a) => a.tool === "escalate")) run.staged.push({ actionId: "escalate#auto", tool: "escalate", input: { tier: res.escalation.tier, decision_required: res.escalation.decisionRequired, summary: res.summaryForHuman, what_was_tried: problems.join("; ") }, status: "staged" });
         }
       }
-      await executeStaged(run, ctx, trace);
-      // Reconciliation: if any write failed or returned unknown, the agent gets one bounded turn to recover
-      // (e.g. book the second contractor) and to rewrite its resolution so the text matches what actually happened.
-      const troubled = run.staged.filter((a) => a.status === "failure" || a.status === "unknown");
-      if (troubled.length && out.kind === "resolution") {
-        const feedback = troubled.map((a) => `${a.tool} (${a.actionId}) -> ${a.status}: ${a.error ?? ""}`).join("; ");
-        trace.log("reconcile.start", { troubled: troubled.map((a) => a.actionId) });
-        const rec = await runAgent(agent, c, route, ctx, deps.models, trace, { revision: { messages: out.messages, feedback: `Execution results after your submission: ${feedback}. All other actions succeeded. Recover where you can (for example a different panel contractor, or a corrected message), stage only the replacement actions, and resubmit a resolution whose decision, summary and communications describe what has actually happened, including any failure that remains. An "unknown" result means the action may or may not have happened: do not repeat it blindly; verify or escalate.`, run }, timeoutMs: budget() });
+      // Phase 1: state-changing actions (tickets, bookings, work orders). Messages wait until results are known.
+      await executeStaged(run, ctx, trace, "state");
+      const troubled = () => run.staged.filter((a) => a.status === "failure" || a.status === "unknown");
+      let claims = await claimCheck(res, run, ctx.store);
+      if ((troubled().length || claims.length) && out.kind === "resolution") {
+        // Reconciliation: one bounded turn with the real results. Pending messages are withdrawn so they can be restaged truthfully.
+        const feedback = troubled().map((a) => `${a.tool} (${a.actionId}) -> ${a.status}: ${a.error ?? ""}`).join("; ") || "none";
+        const withdrawn = withdrawPendingComms(run, trace);
+        trace.log("reconcile.start", { troubled: troubled().map((a) => a.actionId), claims, withdrawn });
+        const rec = await runAgent(agent, c, route, ctx, deps.models, trace, { revision: { messages: out.messages, feedback:
+          `Execution results for your state-changing actions: ${feedback}. ${claims.length ? `Your text described failed actions as done: ${claims.join("; ")}. ` : ""}` +
+          `Your pending messages and escalation (${withdrawn.join(", ") || "none"}) were withdrawn before sending. ` +
+          `Now: (1) recover where you can, for example stage the next suitable panel contractor; if none is suitable, escalate with "NO CONTRACTOR CONFIRMED" as the first words of the decision required; ` +
+          `(2) restage every message you still want to send, written against what has actually happened (a failed booking is not a booking; an unknown result may or may not have happened, verify or escalate, never repeat it blindly); ` +
+          `(3) resubmit a resolution whose decision, summary and communications match reality, including any failure that remains.`, run }, timeoutMs: budget() });
         if (rec.kind === "resolution") {
           const problems = runChecks(c, rec.resolution, rec.run); checks.push(problems);
           trace.log("checks", { pass: checks.length, stage: "reconcile", problems });
-          if (problems.length === 0) { run = rec.run; res = rec.resolution; await executeStaged(run, ctx, trace); }
-          else trace.log("reconcile.rejected", { problems });
+          if (problems.length === 0) {
+            run = rec.run; res = rec.resolution;
+            await executeStaged(run, ctx, trace, "state");
+          } else trace.log("reconcile.rejected", { problems });
+        }
+        claims = await claimCheck(res, run, ctx.store);
+        if (claims.length) {
+          trace.log("claims.unresolved", { claims });
+          // Last resort: never let a false claim go out. Block unsent messages that still make the claim and escalate.
+          for (const a of run.staged) if (a.status === "staged" && a.tool === "send_message" && claims.some((cl) => cl.includes("done"))) { /* keep: writer prepends the truthful status block */ }
+          res = { ...res, finalState: res.finalState === "scheduled" ? "escalated" : res.finalState, escalation: res.escalation.tier === "none" ? { tier: "P1", reason: `claim check: ${claims.join("; ")}`, decisionRequired: "A human must confirm the contractor arrangements; the system could not confirm them.", handover: res.summaryForHuman } : res.escalation };
+          if (!run.staged.some((a) => a.tool === "escalate" && a.status !== "blocked")) run.staged.push({ actionId: "escalate#claims", tool: "escalate", input: { tier: res.escalation.tier === "P0" ? "P0" : "P1", decision_required: res.escalation.decisionRequired, summary: res.summaryForHuman, what_was_tried: claims.join("; ") }, status: "staged" });
         }
       }
+      // Phase 2: communications and handovers, now consistent with results.
+      await executeStaged(run, ctx, trace, "comms");
       if (run.staged.some((a) => a.status === "unknown") && res.finalState === "resolved") res = { ...res, finalState: "awaiting_approval" };
-      await notifyEscalation(c.id, res, trace, ctx.env);
+      page = await notifyEscalation(c.id, res, trace, ctx.env);
     } else {
       run = out.run; error = out.kind === "failed" ? out.error : `reroute from generalist: ${out.reason}`;
     }
@@ -93,7 +112,7 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseOutput> {
     error = String(e);
     trace.log("case.error", { error });
   }
-  writeAnswer(dir, c, res, run, route, { agent: agentName, error, checks });
+  writeAnswer(dir, c, res, run, route, { agent: agentName, error, checks, page });
   const ms = Date.now() - started;
   trace.log("case.end", { ms, status: res ? res.finalState : "error" });
   return { caseId: c.id, folder: deps.folder, status: res ? res.finalState : "error", family: res?.family, urgency: res?.urgency ?? route?.urgency, escalation: res?.escalation.tier, agent: agentName, error, ms };

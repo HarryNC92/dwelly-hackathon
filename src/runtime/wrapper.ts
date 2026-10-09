@@ -30,7 +30,7 @@ export function wrapTools(defs: ToolDef[], ctx: ToolContext, trace: Trace, run: 
           }
           run.staged.push({ actionId, tool: def.name, input, status: "staged" });
           trace.log("tool.staged", { tool: def.name, actionId, input });
-          return { staged: true, actionId, note: "Recorded. Executes after checks pass." };
+          return { staged: true, actionId, note: "Staged, not executed. It runs after checks pass and it can still fail. Do not describe it as done; say it is being arranged, or wait for the execution results." };
         }
         if (def.kind === "control") {
           const parsed = def.input.safeParse(input);

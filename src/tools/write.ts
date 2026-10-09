@@ -29,19 +29,20 @@ export const updateTicket: ToolDef = {
 export const createWorkOrder: ToolDef = {
   name: "create_work_order", kind: "write", risk: "high",
   description: "Instruct work on a property. Requires an estimated cost; spend above landlord authority without a recorded approval is refused.",
-  input: z.object({ property_id: z.string(), ticket_id: z.string().optional(), contractor_id: z.string().optional(), scope: z.string(), estimated_cost_gbp: z.number(), approval_ref: z.string().optional() }),
-  guard: async (i, ctx) => spendGuard(i.property_id, i.estimated_cost_gbp, i.approval_ref, ctx),
+  input: z.object({ property_id: z.string(), ticket_id: z.string().optional(), contractor_id: z.string().optional(), scope: z.string(), estimated_cost_gbp: z.number(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record that approves this spend"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
+  guard: async (i, ctx) => spendGuard(i.property_id, i.estimated_cost_gbp, i.approval_ref, ctx, i.emergency, i.emergency_justification),
   perform: async (i, ctx) => ctx.store.upsert("work_orders", `WO-${ctx.caseId}-${Date.now().toString(36)}`, { ...i, status: "instructed", ...stamp(ctx) }),
 };
 
 export const bookContractor: ToolDef = {
   name: "book_contractor", kind: "write", risk: "high",
   description: "Book an approved contractor from the panel for a slot. Fails if the contractor is not on the panel.",
-  input: z.object({ contractor_id: z.string(), property_id: z.string(), slot: z.string().describe("ISO datetime or window"), scope: z.string(), estimated_cost_gbp: z.number().optional(), approval_ref: z.string().optional() }),
+  input: z.object({ contractor_id: z.string(), property_id: z.string(), slot: z.string().describe("ISO datetime or window"), scope: z.string(), estimated_cost_gbp: z.number().optional(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record that approves this spend"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
   guard: async (i, ctx) => {
     const c = await ctx.store.get("contractors", i.contractor_id);
     if (!c) return `contractor ${i.contractor_id} is not on the approved panel`;
-    return i.estimated_cost_gbp == null ? null : spendGuard(i.property_id, i.estimated_cost_gbp, i.approval_ref, ctx);
+    if (c.data && (c.data as any).on_panel === false) return `contractor ${i.contractor_id} is marked off-panel`;
+    return i.estimated_cost_gbp == null ? null : spendGuard(i.property_id, i.estimated_cost_gbp, i.approval_ref, ctx, i.emergency, i.emergency_justification);
   },
   perform: async (i, ctx) => {
     const f = ctx.failures.take("book_contractor");
@@ -95,21 +96,32 @@ export const reportBlocker: ToolDef = {
 
 export const escalate: ToolDef = {
   name: "escalate", kind: "write", risk: "none",
-  description: "Hand the decision to a human. P1 = same-day handover; P0 = ring the on-call manager now. Always do the safe actions within authority first, then escalate the decision you cannot take.",
+  description: "Record a handover to a human. P1 = same-day handover to the duty manager. P0 = urgent handover; the runtime pages the on-call manager if paging is configured, otherwise it is a record. Do not tell anyone a call has been made. Always do the safe actions within authority first, then escalate the decision you cannot take.",
   input: z.object({ tier: z.enum(["P1", "P0"]), decision_required: z.string(), summary: z.string(), what_was_tried: z.string(), deadline: z.string().optional() }),
   perform: async (i, ctx) => ctx.store.upsert("escalations", `E-${ctx.caseId}`, { ...i, status: "open", ...stamp(ctx) }),
 };
 
 export class UnknownResult extends Error {}
 
-async function spendGuard(propertyId: string, cost: number, approvalRef: string | undefined, ctx: { store: any }): Promise<string | null> {
-  if (approvalRef) return null;
+async function spendGuard(propertyId: string, cost: number, approvalRef: string | undefined, ctx: { store: any }, emergency?: boolean, justification?: string): Promise<string | null> {
+  if (approvalRef) {
+    const dec = await ctx.store.get("landlord_decisions", approvalRef).catch(() => null);
+    if (!dec) return `approval_ref ${approvalRef} does not match a recorded landlord decision; record the decision first or escalate`;
+    return null;
+  }
   const prop = await ctx.store.get("properties", propertyId);
   const landlordId = prop?.data?.landlord_id ?? prop?.data?.landlordId;
   const ll = landlordId ? await ctx.store.get("landlords", String(landlordId)) : null;
-  const authority = Number(ll?.data?.spend_authority_gbp ?? ll?.data?.spendAuthority ?? ll?.data?.authority_limit ?? NaN);
-  if (Number.isNaN(authority)) return null; // unknown authority: let the policy decide, the checks will see it
-  return cost > authority ? `estimated cost £${cost} exceeds landlord authority £${authority} and no approval_ref was given` : null;
+  const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v));
+  const authority = num(ll?.data?.spend_authority_gbp ?? ll?.data?.spendAuthority ?? ll?.data?.authority_limit);
+  const emergencyAuthority = num(ll?.data?.emergency_authority_gbp ?? ll?.data?.emergencyAuthority);
+  if (emergency) {
+    if (!justification) return "emergency spend needs an emergency_justification";
+    if (Number.isNaN(emergencyAuthority)) return Number.isNaN(authority) || cost <= authority ? null : `estimated cost £${cost} exceeds landlord authority £${authority} and no emergency authority is on file`;
+    return cost <= emergencyAuthority ? null : `estimated cost £${cost} exceeds the landlord's emergency authority £${emergencyAuthority}`;
+  }
+  if (Number.isNaN(authority)) return null; // unknown authority: the policy decides and the checks record it
+  return cost > authority ? `estimated cost £${cost} exceeds landlord authority £${authority}; obtain approval (record_landlord_decision + approval_ref), use emergency=true with a justification if this is make-safe work, or escalate` : null;
 }
 
 export const WRITE_TOOLS: ToolDef[] = [createTicket, updateTicket, createWorkOrder, bookContractor, sendMessage, bookInspection, recordLandlordDecision, proposeAction, reportBlocker, escalate];
