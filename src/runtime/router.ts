@@ -15,6 +15,7 @@ export async function route(c: Case, models: ModelFactory, trace: Trace, modelId
       output: Output.object({ schema: RouteSchema }),
       providerOptions: { anthropic: { thinking: { type: "adaptive" }, effort: "low" } },
       maxRetries: 4,
+      abortSignal: AbortSignal.timeout(90_000),
     });
     const route = r.output;
     const bump = c.flags.map((f) => f.minUrgency).filter(Boolean) as string[];

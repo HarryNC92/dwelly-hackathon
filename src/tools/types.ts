@@ -10,6 +10,7 @@ export type ToolContext = {
   store: RecordStore;
   failures: FailureInjector;
   now: string; // dataset "now", never the wall clock
+  actionId?: string; // set during execution of a staged write
   env: Record<string, string | undefined>;
 };
 

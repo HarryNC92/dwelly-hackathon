@@ -22,7 +22,7 @@ export function mockModels(): ModelFactory {
         ] };
       }
       return { ...base, finishReason: { unified: "tool-calls", raw: "tool_use" }, content: [{ type: "tool-call", toolCallId: "c3", toolName: "submit_resolution", input: JSON.stringify({
-        family: "maintenance", urgency: "P1", decision: "Mock decision.", summaryForHuman: "Mock summary.", notDone: [], conflicts: [], missingInformation: [], communications: [{ party: "tenant", channel: "email", gist: "acknowledged" }], escalation: { tier: "none" }, finalState: "scheduled" }) }] };
+        family: "maintenance", urgency: "P1", decision: "Mock decision.", summaryForHuman: "Mock summary.", notDone: [], conflicts: [], missingInformation: [], flagAssessments: [], communications: [{ party: "tenant", channel: "email", gist: "acknowledged" }], escalation: { tier: "none" }, finalState: "scheduled" }) }] };
     },
   } as any);
 }

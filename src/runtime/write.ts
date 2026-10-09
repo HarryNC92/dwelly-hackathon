@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Case } from "../schemas/case.js";
 import type { Resolution, Route } from "../schemas/resolution.js";
 import type { CaseRun } from "./wrapper.js";
+import { Trace } from "./trace.js";
 
 export type CaseOutput = { caseId: string; folder: string; status: string; family?: string; urgency?: string; escalation?: string; agent?: string; error?: string; ms: number };
 
@@ -24,7 +25,9 @@ export function writeAnswer(dir: string, c: Case, res: Resolution | null, run: C
     return `## Execution status (generated from execution results, not from the agent's text)\n${lines.join("\n")}`;
   };
   const messages = run.staged.filter((a) => a.tool === "send_message" && a.status === "success").map((a) => { const i = a.input as any; return `### To ${i.to_party} (${i.to_ref}) via ${i.channel}${i.subject ? ` — ${i.subject}` : ""}\n${String(i.body).trim()}`; });
-  const executed = run.staged.filter((a) => a.status === "success");
+  const HUMAN = new Set(["propose_action", "report_blocker", "escalate"]);
+  const executed = run.staged.filter((a) => a.status === "success" && !HUMAN.has(a.tool));
+  const recorded = run.staged.filter((a) => a.status === "success" && HUMAN.has(a.tool));
   const failed = run.staged.filter((a) => a.status === "failure" || a.status === "unknown");
   const blocked = run.staged.filter((a) => a.status === "blocked");
 
@@ -37,6 +40,7 @@ ${res.decision}
 
 ## Actions taken
 ${executed.map(actionLine).join("\n") || "- none executed"}
+${recorded.length ? `\n### Recorded for a human (not executed by the system)\n${recorded.map(actionLine).join("\n")}` : ""}
 ${failed.length ? `\n### Actions that failed or returned unknown\n${failed.map(actionLine).join("\n")}` : ""}
 ${blocked.length ? `\n### Actions blocked by guards or checks\n${blocked.map(actionLine).join("\n")}` : ""}
 
@@ -73,7 +77,7 @@ ${executed.map(actionLine).join("\n") || "- none executed"}
 ${run.staged.filter((a) => a.status === "staged").length ? `\n### Actions proposed but not executed\n${run.staged.filter((a) => a.status === "staged").map(actionLine).join("\n")}` : ""}
 
 ## Escalation
-Tier P1. Decision required from a human: review this case from the raw content and the trace, and process it manually.
+Tier ${c.flags.some((f) => f.minUrgency === "P0") ? "P0" : "P1"}. Decision required from a human: review this case from the raw content and the trace, and process it manually${c.flags.some((f) => f.minUrgency === "P0") ? " now; a P0 safety flag was raised" : ""}.
 
 ## Final state
 escalated (automatic: pipeline failure)
@@ -82,7 +86,7 @@ escalated (automatic: pipeline failure)
 
   // Compact tool table from the trace, so the reasoning is readable without opening the JSONL.
   const traceFile = path.join(dir, "trace.jsonl");
-  const events = fs.existsSync(traceFile) ? fs.readFileSync(traceFile, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
+  const events = Trace.readSafe(traceFile) as any[];
   const toolRows = events.filter((e) => String(e.event).startsWith("tool.") || String(e.event).startsWith("execute.")).map((e) => {
     const kind = String(e.event).replace("tool.", "").replace("execute.", "exec:");
     const what = e.actionId ? `${e.actionId}` : (e.tool ?? "");

@@ -1,4 +1,4 @@
-# Architecture (v4, matches the code as of 02:00, 10 Oct 2026)
+# Architecture (v4, matches the code as of 03:30, 10 Oct 2026)
 
 Read MORNING.md first for the plan of the day. This file is the design and the reasons.
 
@@ -70,4 +70,4 @@ TypeSafe AI's classifier is behind `src/classify/` as a shadow signal: if `TYPES
 
 ## 10. What was verified tonight
 
-Offline smoke passes (mock model, injected unknown result, forced gas escalation, reconciliation). Nine real cases ran end to end on Opus 5.5 before the org's API credit ran out: 52 of 54 deterministic checks passed; 45 to 65 seconds per case at concurrency 8. The gas emergency, break-in, water-through-light-fitting, arrears hardship, expired gas certificate, solicitor complaint, mould with a newborn and spam cases all resolved the way the expectations say. One defect found and fixed: text claimed a booking that had failed at execution, now covered by the reconciliation turn.
+Offline smoke passes (mock model, injected unknown result, forced gas escalation, reconciliation). Nine real cases ran end to end on Opus 5.5 before the org's API credit ran out: 52 of 54 deterministic checks passed; 45 to 65 seconds per case at concurrency 8. The gas emergency, break-in, water-through-light-fitting, arrears hardship, expired gas certificate, solicitor complaint, mould with a newborn and spam cases all resolved the way the expectations say. One systematic defect found by the judge simulation and fixed: text claimed bookings that had failed at execution (six of six booking cases). Now covered by two-phase execution, the reconciliation turn, the claim check and the execution status block. A code review then reproduced and fixed a further nineteen robustness issues (ids, resume, ingest, flags, guards, deadlines). The reconciliation path is verified on the mock model only; the first real run in the morning is its test.

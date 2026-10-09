@@ -6,12 +6,13 @@ import type { ToolDef } from "./types.js";
  * `perform` writes to the record store (and, behind env flags, real transports).
  */
 const stamp = (ctx: { caseId: string; now: string }) => ({ case_id: ctx.caseId, created_at: ctx.now, created_by: "agent" });
+const rid = (prefix: string, ctx: { caseId: string; actionId?: string }) => `${prefix}-${ctx.caseId}-${(ctx.actionId ?? Date.now().toString(36)).replace(/[^A-Za-z0-9_#-]/g, "")}`;
 
 export const createTicket: ToolDef = {
   name: "create_ticket", kind: "write", risk: "low",
   description: "Open a maintenance or operations ticket against a property.",
   input: z.object({ property_id: z.string(), title: z.string(), category: z.string(), urgency: z.enum(["P0", "P1", "P2"]), description: z.string() }),
-  perform: async (i, ctx) => ctx.store.upsert("tickets", `T-${ctx.caseId}-${Date.now().toString(36)}`, { ...i, status: "open", ...stamp(ctx) }),
+  perform: async (i, ctx) => ctx.store.upsert("tickets", rid("T", ctx), { ...i, status: "open", ...stamp(ctx) }),
 };
 
 export const updateTicket: ToolDef = {
@@ -31,7 +32,7 @@ export const createWorkOrder: ToolDef = {
   description: "Instruct work on a property. Requires an estimated cost; spend above landlord authority without a recorded approval is refused.",
   input: z.object({ property_id: z.string(), ticket_id: z.string().optional(), contractor_id: z.string().optional(), scope: z.string(), estimated_cost_gbp: z.number(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record that approves this spend"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
   guard: async (i, ctx) => spendGuard(i.property_id, i.estimated_cost_gbp, i.approval_ref, ctx, i.emergency, i.emergency_justification),
-  perform: async (i, ctx) => ctx.store.upsert("work_orders", `WO-${ctx.caseId}-${Date.now().toString(36)}`, { ...i, status: "instructed", ...stamp(ctx) }),
+  perform: async (i, ctx) => ctx.store.upsert("work_orders", rid("WO", ctx), { ...i, status: "instructed", ...stamp(ctx) }),
 };
 
 export const bookContractor: ToolDef = {
@@ -42,13 +43,16 @@ export const bookContractor: ToolDef = {
     const c = await ctx.store.get("contractors", i.contractor_id);
     if (!c) return `contractor ${i.contractor_id} is not on the approved panel`;
     if (c.data && (c.data as any).on_panel === false) return `contractor ${i.contractor_id} is marked off-panel`;
-    return i.estimated_cost_gbp == null ? null : spendGuard(i.property_id, i.estimated_cost_gbp, i.approval_ref, ctx, i.emergency, i.emergency_justification);
+    const dnu = await doNotUse(i.property_id, c.data as any, ctx);
+    if (dnu) return dnu;
+    const cost = i.estimated_cost_gbp ?? Number((c.data as any).callout_gbp ?? (c.data as any).callout ?? NaN);
+    return Number.isNaN(cost) ? null : spendGuard(i.property_id, cost, i.approval_ref, ctx, i.emergency, i.emergency_justification);
   },
   perform: async (i, ctx) => {
     const f = ctx.failures.take("book_contractor");
     if (f === "fail") throw new Error("contractor booking rejected: no availability");
     if (f === "unknown") throw new UnknownResult("booking request timed out");
-    return ctx.store.upsert("bookings", `B-${ctx.caseId}-${Date.now().toString(36)}`, { ...i, status: "confirmed", ...stamp(ctx) });
+    return ctx.store.upsert("bookings", rid("B", ctx), { ...i, status: "confirmed", ...stamp(ctx) });
   },
 };
 
@@ -56,13 +60,13 @@ export const sendMessage: ToolDef = {
   name: "send_message", kind: "write", risk: "low",
   description: "Send a message to a tenant, landlord or contractor. Never commit the landlord to money or a legal position; never share more tenant data than the job needs.",
   input: z.object({ to_party: z.enum(["tenant", "landlord", "contractor", "other"]), to_ref: z.string().describe("Record id or contact as held on file"), channel: z.enum(["email", "sms", "whatsapp", "portal"]), subject: z.string().optional(), body: z.string() }),
-  guard: async (i) => /\b(compensat|refund|rent reduction|we will pay|will be reimbursed|legal advice|you must leave|eviction)\b/i.test(i.body) ? "message commits the landlord to money or a legal position" : null,
+  guard: async (i) => /\b((we|the landlord|your landlord) will (pay|refund|compensate|reimburse|reduce)|compensat\w*|rent (reduction|rebate|holiday)|section (8|21)|notice (to quit|seeking possession|to leave)|rent increase|evict\w*|you (must|have to|need to) (leave|move out|vacate))\b/i.test(i.body) ? "message commits the landlord to money or a legal position (compensation, rent change, notices, eviction)" : null,
   perform: async (i, ctx) => {
     const f = ctx.failures.take("send_message");
     if (f === "fail") throw new Error("delivery failed: address rejected");
     if (f === "unknown") throw new UnknownResult("delivery status unknown");
     // Real transports (Twilio/Resend) hang here behind env flags for the demo; default is record-only.
-    return ctx.store.upsert("messages", `M-${ctx.caseId}-${Date.now().toString(36)}`, { ...i, status: "sent", ...stamp(ctx) });
+    return ctx.store.upsert("messages", rid("M", ctx), { ...i, status: "sent", ...stamp(ctx) });
   },
 };
 
@@ -70,38 +74,49 @@ export const bookInspection: ToolDef = {
   name: "book_inspection", kind: "write", risk: "low",
   description: "Book a compliance inspection (gas safety, EICR, EPC, legionella, fire) with an approved contractor.",
   input: z.object({ property_id: z.string(), inspection_type: z.string(), contractor_id: z.string().optional(), by_date: z.string() }),
-  perform: async (i, ctx) => ctx.store.upsert("inspections", `I-${ctx.caseId}-${Date.now().toString(36)}`, { ...i, status: "requested", ...stamp(ctx) }),
+  perform: async (i, ctx) => ctx.store.upsert("inspections", rid("I", ctx), { ...i, status: "requested", ...stamp(ctx) }),
 };
 
 export const recordLandlordDecision: ToolDef = {
   name: "record_landlord_decision", kind: "write", risk: "low",
   description: "Record a decision the landlord has communicated (approval, refusal, instruction) with its source.",
   input: z.object({ landlord_id: z.string(), decision: z.string(), source: z.string().describe("Where the decision came from, e.g. email dated X") }),
-  perform: async (i, ctx) => ctx.store.upsert("landlord_decisions", `LD-${ctx.caseId}-${Date.now().toString(36)}`, { ...i, ...stamp(ctx) }),
+  perform: async (i, ctx) => ctx.store.upsert("landlord_decisions", rid("LD", ctx), { ...i, ...stamp(ctx) }),
 };
 
 export const proposeAction: ToolDef = {
   name: "propose_action", kind: "write", risk: "none",
   description: "Record an action that should happen but which you have no tool for (e.g. source a contractor outside the panel, raise an insurance claim). It is never executed by the system; it appears in the answer as a recommended human action.",
   input: z.object({ action_type: z.string(), target: z.string(), parameters: z.string(), rationale: z.string() }),
-  perform: async (i, ctx) => ctx.store.upsert("proposed_actions", `PA-${ctx.caseId}-${Date.now().toString(36)}`, { ...i, status: "proposed", ...stamp(ctx) }),
+  perform: async (i, ctx) => ctx.store.upsert("proposed_actions", rid("PA", ctx), { ...i, status: "proposed", ...stamp(ctx) }),
 };
 
 export const reportBlocker: ToolDef = {
   name: "report_blocker", kind: "write", risk: "none",
   description: "Record that the case cannot be completed because a capability or piece of information does not exist. Say exactly what was needed and why.",
   input: z.object({ needed: z.string(), why: z.string() }),
-  perform: async (i, ctx) => ctx.store.upsert("blockers", `BL-${ctx.caseId}-${Date.now().toString(36)}`, { ...i, ...stamp(ctx) }),
+  perform: async (i, ctx) => ctx.store.upsert("blockers", rid("BL", ctx), { ...i, ...stamp(ctx) }),
 };
 
 export const escalate: ToolDef = {
   name: "escalate", kind: "write", risk: "none",
   description: "Record a handover to a human. P1 = same-day handover to the duty manager. P0 = urgent handover; the runtime pages the on-call manager if paging is configured, otherwise it is a record. Do not tell anyone a call has been made. Always do the safe actions within authority first, then escalate the decision you cannot take.",
   input: z.object({ tier: z.enum(["P1", "P0"]), decision_required: z.string(), summary: z.string(), what_was_tried: z.string(), deadline: z.string().optional() }),
-  perform: async (i, ctx) => ctx.store.upsert("escalations", `E-${ctx.caseId}`, { ...i, status: "open", ...stamp(ctx) }),
+  perform: async (i, ctx) => ctx.store.upsert("escalations", rid("E", ctx), { ...i, status: "open", ...stamp(ctx) }),
 };
 
 export class UnknownResult extends Error {}
+
+async function doNotUse(propertyId: string, contractor: any, ctx: { store: any }): Promise<string | null> {
+  const prop = await ctx.store.get("properties", propertyId).catch(() => null);
+  const landlordId = prop?.data?.landlord_id ?? prop?.data?.landlordId;
+  const ll = landlordId ? await ctx.store.get("landlords", String(landlordId)).catch(() => null) : null;
+  const instr = String(ll?.data?.instructions ?? ll?.data?.notes ?? "");
+  const name = String(contractor?.name ?? "");
+  const m = instr.match(/do not (use|instruct|send)\s+([^.;\n]+)/i);
+  if (m && name && m[2].toLowerCase().includes(name.toLowerCase().split(" ")[0])) return `landlord instruction on file: "${m[0].trim()}"`;
+  return null;
+}
 
 async function spendGuard(propertyId: string, cost: number, approvalRef: string | undefined, ctx: { store: any }, emergency?: boolean, justification?: string): Promise<string | null> {
   if (approvalRef) {

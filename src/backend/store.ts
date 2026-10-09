@@ -47,8 +47,9 @@ export class RecordStore {
     const params: unknown[] = terms.map((t) => `%${t.replace(/[%_]/g, "")}%`);
     let where = conds.join(" AND ");
     if (type) { params.push(type); where += ` AND type = $${params.length}`; }
+    params.push(q.trim()); const qi = params.length;
     params.push(limit);
-    return this.sql.query<Row>(`SELECT type, id, data FROM ${this.t()} WHERE ${where} LIMIT $${params.length}`, params);
+    return this.sql.query<Row>(`SELECT type, id, data FROM ${this.t()} WHERE ${where} ORDER BY (id = $${qi}) DESC, (data ? 'case_id') ASC, type, id LIMIT $${params.length}`, params);
   }
 
   async list(type: string, limit = 50): Promise<Row[]> {
@@ -58,7 +59,7 @@ export class RecordStore {
   /** Read-only SQL for the generalist. Rejects anything that is not a single SELECT. */
   async readOnlyQuery(text: string, limit = 50): Promise<Record<string, unknown>[]> {
     const t = text.trim().replace(/;+$/, "");
-    if (!/^select\s/i.test(t) || /;|\b(insert|update|delete|drop|alter|create|truncate|grant)\b/i.test(t)) {
+    if (!/^select\s/i.test(t) || /;|\b(insert|update|delete|drop|alter|create|truncate|grant|pg_sleep|generate_series|dblink|pg_read|lo_|copy|vacuum)\b/i.test(t)) {
       throw new Error("query_records accepts a single SELECT statement only");
     }
     return this.sql.query(`SELECT * FROM (${t}) AS q LIMIT ${Math.min(limit, 200)}`);

@@ -42,6 +42,7 @@ export const ResolutionSchema = z.object({
   notDone: z.array(z.object({ action: z.string(), reason: z.string() })).describe("Actions deliberately not taken"),
   conflicts: z.array(z.object({ facts: z.string(), resolution: z.string() })).describe("Conflicting information and how it was weighed"),
   missingInformation: z.array(z.string()),
+  flagAssessments: z.array(z.object({ flag: z.string(), falsePositive: z.boolean(), reason: z.string() })).describe("One entry per deterministic flag you were given: whether it is a false positive and why"),
   communications: z.array(z.object({ party: z.string(), channel: z.string(), gist: z.string() })),
   escalation: EscalationSchema,
   finalState: z.enum(["resolved", "scheduled", "awaiting_approval", "escalated", "closed_no_action", "blocked"]),

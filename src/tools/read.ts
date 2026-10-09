@@ -35,7 +35,7 @@ export const queryRecords: ToolDef = {
   name: "query_records", kind: "read", risk: "none",
   description: "Read-only SQL over the records table (columns: type TEXT, id TEXT, data JSONB). Single SELECT only. Example: SELECT id, data->>'expiry' FROM records WHERE type='certificates' AND data->>'property_id'='P12'.",
   input: z.object({ sql: z.string(), limit }),
-  run: async (i, ctx) => ctx.store.readOnlyQuery(i.sql.replace(/\brecords\b/g, `"${ctx.store.schema}".records`), i.limit ?? 50),
+  run: async (i, ctx) => ctx.store.readOnlyQuery(ctx.store.schema === "public" ? i.sql : i.sql.replace(/\bfrom\s+records\b/gi, `FROM "${ctx.store.schema}".records`), i.limit ?? 50),
 };
 
 /** Typed convenience reads. Thin wrappers; the generic tools above work on any dataset. */
