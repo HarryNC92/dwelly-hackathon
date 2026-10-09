@@ -1,0 +1,6 @@
+[
+  {"id":"T-9001","property_id":"P-101","tenancy_id":"TEN-2001","created_at":"2026-07-14T10:02:00Z","category":"drainage","title":"Kitchen sink draining slowly","status":"closed","resolution":"CON-01 attended 16 Jul, cleared partial blockage in shared stack. Engineer note: stack serving flats 3 and 5 shows scale build-up; recommend jetting within 6 months.","cost_gbp":205},
+  {"id":"T-9002","property_id":"P-103","tenancy_id":"TEN-2003","created_at":"2026-09-28T14:30:00Z","category":"heating","title":"Boiler intermittently losing pressure","status":"in_progress","resolution":"CON-02 attended 1 Oct: diagnosed failing expansion vessel, part ordered, return visit booked 9 Oct 09:00-12:00. Boiler currently running with manual top-ups.","cost_gbp":0,"notes":[{"at":"2026-10-07T16:10:00Z","by":"CON-02","note":"Part delayed by supplier, new ETA 13 Oct. Tenant informed by phone."}]},
+  {"id":"T-9003","property_id":"P-105","tenancy_id":"TEN-2005","created_at":"2026-08-20T09:00:00Z","category":"damp","title":"Condensation on bedroom window","status":"closed","resolution":"Advised tenant on ventilation. No inspection carried out.","cost_gbp":0},
+  {"id":"T-9004","property_id":"P-104","tenancy_id":"TEN-2004","created_at":"2026-10-05T11:20:00Z","category":"electrical","title":"Storage heater in living room not heating","status":"open","resolution":null,"cost_gbp":0}
+]

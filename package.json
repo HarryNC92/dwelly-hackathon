@@ -7,7 +7,10 @@
   "scripts": {
     "cases": "tsx src/run.ts",
     "typecheck": "tsc --noEmit",
-    "smoke": "tsx src/run.ts --cases ./cases/smoke --out ./out/smoke --backend local"
+    "smoke": "tsx src/run.ts --cases ./cases/smoke --out ./out/smoke --backend local",
+    "eval": "tsx src/eval.ts",
+    "service": "tsx src/service.ts",
+    "judge": "tsx src/judge.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.78",
@@ -22,6 +25,7 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "yaml": "^2.9.1"
   }
 }

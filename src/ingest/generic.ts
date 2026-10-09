@@ -49,7 +49,8 @@ export async function buildCase(id: string, files: string[]): Promise<Case> {
       attachments.push({ name: path.basename(f), mediaType: FILE_EXT[ext], path: f });
     }
   }
-  const c = CaseSchema.parse({ id, channel, receivedAt, rawText: rawText.trim() || "(no text content; see attachments)", structured, attachments, linkedIds, sourceFiles: files.map((f) => path.basename(f)), flags: [] });
+  const kind = /(^|\n)\s*(question|decision point|what should|should the agent|how should)\b/i.test(rawText) || /\?\s*$/.test(rawText.trim()) ? "question" : "event";
+  const c = CaseSchema.parse({ id, channel, kind, receivedAt, rawText: rawText.trim() || "(no text content; see attachments)", structured, attachments, linkedIds, sourceFiles: files.map((f) => path.basename(f)), flags: [] });
   c.flags = computeFlags(c.rawText);
   return c;
 }

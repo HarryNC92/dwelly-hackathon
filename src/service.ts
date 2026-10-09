@@ -8,6 +8,8 @@ import path from "node:path";
  *   GET  /api/cases/:id            handover pack (from the run output)
  *   POST /api/escalations          { case_id, to_number, summary, decision_required } -> places the ElevenLabs outbound call
  *   POST /api/webhooks/elevenlabs  post-call webhook -> writes out/<case>/callback.json
+ *   GET  /                         live board (public/board.html)
+ *   GET  /api/status               per-case status derived from trace files
  *   GET  /health
  */
 const OUT = path.resolve(process.env.OUT_DIR ?? "./ANSWERS");
@@ -43,6 +45,19 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://x");
   try {
     if (req.method === "GET" && url.pathname === "/health") return json(res, 200, { ok: true });
+    if (req.method === "GET" && url.pathname === "/") { res.writeHead(200, { "content-type": "text/html" }); return res.end(fs.readFileSync(path.join(process.cwd(), "public", "board.html"))); }
+    if (req.method === "GET" && url.pathname === "/api/status") {
+      const cases = fs.existsSync(OUT) ? fs.readdirSync(OUT, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => {
+        const tf = path.join(OUT, e.name, "trace.jsonl");
+        const events = fs.existsSync(tf) ? fs.readFileSync(tf, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
+        const end = events.find((x) => x.event === "case.end"); const route = events.find((x) => x.event === "route"); const submit = [...events].reverse().find((x) => x.event === "agent.submit");
+        const start = events.find((x) => x.event === "agent.start");
+        const answer = fs.existsSync(path.join(OUT, e.name, "ANSWER.md")) ? fs.readFileSync(path.join(OUT, e.name, "ANSWER.md"), "utf8") : "";
+        const summary = answer.match(/## Summary\n([\s\S]*?)$/)?.[1]?.trim() ?? "";
+        return { id: e.name, status: end ? end.status : events.length ? "running" : "queued", urgency: submit?.urgency ?? route?.urgency, family: submit?.family ?? route?.families?.[0], agent: start?.agent, summary, events: events.map((x) => ({ event: x.event, tool: x.tool, problems: x.problems })) };
+      }) : [];
+      return json(res, 200, { cases });
+    }
     const m = url.pathname.match(/^\/api\/cases\/([^/]+)$/);
     if (req.method === "GET" && m) {
       const dir = path.join(OUT, decodeURIComponent(m[1]));

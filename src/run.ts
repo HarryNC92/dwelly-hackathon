@@ -11,6 +11,7 @@ import { runCase } from "./orchestrator/runCase.js";
 import { realModels } from "./runtime/models.js";
 import { mockModels } from "./runtime/mock.js";
 import { writeSummary, type CaseOutput } from "./runtime/write.js";
+import type { Case } from "./schemas/case.js";
 
 const program = new Command()
   .requiredOption("--cases <dir>", "directory of cases (one file or folder per case)")
@@ -23,9 +24,22 @@ const program = new Command()
   .option("--deadline <min>", "global deadline in minutes; no new cases start after it", "22")
   .option("--inject <spec>", "failure injection, e.g. book_contractor:fail:1,send_message:unknown:1")
   .option("--mock-model", "use a canned model (offline smoke test)", false)
+  .option("--numbered", "write folders 1..N in input order (organiser format) with an index.json mapping", false)
+  .option("--no-group", "do not serialise cases that share a property")
   .option("--only <ids>", "comma-separated case ids")
   .parse();
 const o = program.opts();
+
+/** Cases about the same property run in timestamp order so later cases see earlier state. */
+function groupKey(c: Case): string {
+  const ids = Object.entries(c.linkedIds).find(([k]) => /propert|address|unit/i.test(k));
+  if (ids) return `id:${ids[1]}`;
+  const pc = c.rawText.match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i);
+  if (pc) return `pc:${pc[1].replace(/\s+/g, "").toUpperCase()}`;
+  const addr = c.rawText.match(/\b\d{1,4}[a-z]?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Street|Road|Lane|Avenue|Close|Crescent|Gardens|Place|Square|Terrace|Way|Drive|Court|Mews|Grove|Hill|Park|Row|Walk)\b/);
+  if (addr) return `addr:${addr[0].toLowerCase()}`;
+  return `case:${c.id}`;
+}
 
 async function main() {
   const started = Date.now();
@@ -38,31 +52,42 @@ async function main() {
 
   let cases = await loadCases(path.resolve(o.cases));
   if (o.only) { const ids = new Set(String(o.only).split(",")); cases = cases.filter((c) => ids.has(c.id)); }
+  const folderOf = new Map<string, string>();
+  cases.forEach((c, i) => folderOf.set(c.id, o.numbered ? String(i + 1) : c.id));
+  fs.writeFileSync(path.join(outDir, "index.json"), JSON.stringify(cases.map((c) => ({ folder: folderOf.get(c.id), case_id: c.id, files: c.sourceFiles, channel: c.channel, received_at: c.receivedAt ?? null })), null, 2));
+
   // Resume: skip cases that already have an ANSWER.md
-  const pending = cases.filter((c) => !fs.existsSync(path.join(outDir, c.id, "ANSWER.md")));
-  // Urgent first
-  const rank = (c: typeof cases[number]) => (c.flags.some((f) => f.minUrgency === "P0") ? 0 : c.flags.some((f) => f.minUrgency === "P1") ? 1 : 2);
-  pending.sort((a, b) => rank(a) - rank(b));
-  console.log(`cases: ${cases.length}, pending: ${pending.length}, concurrency: ${o.concurrency}`);
+  const pending = cases.filter((c) => !fs.existsSync(path.join(outDir, folderOf.get(c.id)!, "ANSWER.md")));
+  // Urgent first, then by time
+  const rank = (c: Case) => (c.flags.some((f) => f.minUrgency === "P0") ? 0 : c.flags.some((f) => f.minUrgency === "P1") ? 1 : 2);
+  pending.sort((a, b) => rank(a) - rank(b) || String(a.receivedAt ?? "").localeCompare(String(b.receivedAt ?? "")));
+  // Group by property: each group runs sequentially in time order; groups run in parallel.
+  const groups = new Map<string, Case[]>();
+  for (const c of pending) { const k = o.group === false ? `case:${c.id}` : groupKey(c); groups.set(k, [...(groups.get(k) ?? []), c]); }
+  for (const g of groups.values()) g.sort((a, b) => String(a.receivedAt ?? "").localeCompare(String(b.receivedAt ?? "")));
+  console.log(`cases: ${cases.length}, pending: ${pending.length}, groups: ${groups.size}, concurrency: ${o.concurrency}`);
 
   const limit = pLimit(Number(o.concurrency));
+  const failures = new FailureInjector(o.inject); // one injector per run: "tool:mode:count" means count failures in total
   const deadlineMs = Number(o.deadline) * 60_000;
   const rows: CaseOutput[] = [];
-  await Promise.all(pending.map((c) => limit(async () => {
+  const runOne = async (c: Case) => {
+    const folder = folderOf.get(c.id)!;
     if (Date.now() - started > deadlineMs) {
-      fs.mkdirSync(path.join(outDir, c.id), { recursive: true });
-      fs.writeFileSync(path.join(outDir, c.id, "ANSWER.md"), `# Case ${c.id}\n\n## Decision\nNot processed: global deadline reached before this case started.\n\n## Escalation\nTier P1. A human must process this case.\n\n## Final state\nescalated (deadline)\n`);
-      rows.push({ caseId: c.id, status: "deadline", ms: 0 });
+      const dir = path.join(outDir, folder); fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "ANSWER.md"), `# Case ${c.id}\n\n## Decision\nNot processed: the run's global deadline was reached before this case started.\n\n## Escalation\nTier P1. A human must process this case.\n\n## Final state\nescalated (deadline)\n`);
+      rows.push({ caseId: c.id, folder, status: "deadline", ms: 0 });
       return;
     }
     const row = await runCase(c, {
-      models, outDir, caseTimeoutMs: Number(o.caseTimeout) * 60_000,
-      ctxFor: (cc) => ({ caseId: cc.id, store, failures: new FailureInjector(o.inject), now: cc.receivedAt ?? new Date().toISOString(), env: process.env }),
+      models, outDir, folder, caseTimeoutMs: Number(o.caseTimeout) * 60_000,
+      ctxFor: (cc) => ({ caseId: cc.id, store, failures, now: cc.receivedAt ?? new Date().toISOString(), env: process.env }),
     });
     rows.push(row);
-    console.log(`${row.caseId}: ${row.status} ${row.family ?? ""} ${row.urgency ?? ""} esc=${row.escalation ?? "-"} agent=${row.agent ?? "-"} ${(row.ms / 1000).toFixed(0)}s${row.error ? ` ERROR ${row.error.slice(0, 120)}` : ""}`);
-  })));
-  rows.sort((a, b) => a.caseId.localeCompare(b.caseId, undefined, { numeric: true }));
+    console.log(`${row.folder}=${row.caseId}: ${row.status} ${row.family ?? ""} ${row.urgency ?? ""} esc=${row.escalation ?? "-"} agent=${row.agent ?? "-"} ${(row.ms / 1000).toFixed(0)}s${row.error ? ` ERROR ${row.error.slice(0, 120)}` : ""}`);
+  };
+  await Promise.all([...groups.values()].map((g) => limit(async () => { for (const c of g) await runOne(c); })));
+  rows.sort((a, b) => a.folder.localeCompare(b.folder, undefined, { numeric: true }));
   writeSummary(outDir, rows);
   await store.close();
   console.log(`done in ${((Date.now() - started) / 1000).toFixed(0)}s -> ${outDir}/summary.md`);

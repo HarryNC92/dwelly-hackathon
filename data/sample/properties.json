@@ -1,0 +1,8 @@
+[
+  {"id":"P-101","address":"Flat 3, 12 Rose Street, London","postcode":"E2 7QN","type":"flat","bedrooms":2,"floor":1,"landlord_id":"LL-1","building_id":"BLD-12ROSE","access_notes":"Entry phone, tenant must let contractors in. No key safe.","heating":"gas combi boiler (Vaillant, installed 2021)","gas_supply":true},
+  {"id":"P-102","address":"Flat 5, 12 Rose Street, London","postcode":"E2 7QN","type":"flat","bedrooms":1,"floor":2,"landlord_id":"LL-1","building_id":"BLD-12ROSE","access_notes":"Entry phone.","heating":"gas combi boiler","gas_supply":true},
+  {"id":"P-103","address":"44 Albion Road, London","postcode":"N16 9PD","type":"house","bedrooms":3,"landlord_id":"LL-2","access_notes":"Key safe at side gate, code held by agency.","heating":"gas system boiler, 2016","gas_supply":true},
+  {"id":"P-104","address":"Flat 2B, 7 Mare Street, London","postcode":"E8 4RP","type":"flat","bedrooms":1,"landlord_id":"LL-3","access_notes":"Concierge 8am-8pm.","heating":"electric storage heaters","gas_supply":false},
+  {"id":"P-105","address":"19 Kingsland High Street, London","postcode":"E8 2JS","type":"maisonette","bedrooms":2,"landlord_id":"LL-4","access_notes":"Tenant only.","heating":"gas combi boiler, 2012","gas_supply":true},
+  {"id":"P-106","address":"Flat 1, 88 Dalston Lane, London","postcode":"E8 3AH","type":"flat","bedrooms":2,"landlord_id":"LL-2","access_notes":"Key safe front porch.","heating":"gas combi boiler, 2019","gas_supply":true}
+]

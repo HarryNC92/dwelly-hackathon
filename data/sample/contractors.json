@@ -1,0 +1,10 @@
+[
+  {"id":"CON-01","name":"Hackney Drainage Co","trades":["drainage","plumbing"],"areas":["E2","E8","N16"],"callout_gbp":120,"hourly_gbp":85,"emergency_24h":true,"gas_safe":false,"rating":4.7,"availability":"same day for emergencies, next day otherwise","on_panel":true},
+  {"id":"CON-02","name":"Pinnacle Plumbing & Heating","trades":["plumbing","heating","gas"],"areas":["E2","E8","N16","N1"],"callout_gbp":95,"hourly_gbp":75,"emergency_24h":true,"gas_safe":true,"gas_safe_reg":"554433","rating":4.5,"availability":"within 24h","on_panel":true},
+  {"id":"CON-03","name":"Bright Spark Electrical","trades":["electrical","EICR"],"areas":["E2","E8","N16"],"callout_gbp":110,"hourly_gbp":80,"emergency_24h":true,"gas_safe":false,"rating":4.8,"availability":"2 working days; same day for emergencies","on_panel":true},
+  {"id":"CON-04","name":"Quickfix Plumbing","trades":["plumbing"],"areas":["E2","E8"],"callout_gbp":60,"hourly_gbp":55,"emergency_24h":false,"gas_safe":false,"rating":3.1,"availability":"variable","on_panel":true,"notes":"Two complaints on file (missed appointments). LL-1 has asked not to use."},
+  {"id":"CON-05","name":"SafeCert Gas Services","trades":["gas","gas safety certificate","boiler service"],"areas":["E2","E8","N16","N1","E5"],"callout_gbp":0,"gas_safety_check_gbp":85,"gas_safe":true,"gas_safe_reg":"778899","rating":4.9,"availability":"3 working days","on_panel":true},
+  {"id":"CON-06","name":"East London Pest Control","trades":["pest control"],"areas":["E2","E8","N16"],"callout_gbp":150,"rating":4.4,"availability":"2 working days","on_panel":true},
+  {"id":"CON-07","name":"Dalston Locks & Glazing","trades":["locksmith","glazing","boarding"],"areas":["E8","N16","E2"],"callout_gbp":140,"emergency_24h":true,"rating":4.6,"availability":"within 2 hours for emergencies","on_panel":true},
+  {"id":"CON-08","name":"Mould & Damp Specialists UK","trades":["damp survey","mould treatment"],"areas":["London"],"callout_gbp":220,"rating":4.3,"availability":"5 working days","on_panel":true}
+]

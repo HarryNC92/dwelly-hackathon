@@ -17,7 +17,7 @@ export function wrapTools(defs: ToolDef[], ctx: ToolContext, trace: Trace, run: 
     out[def.name] = tool({
       description: def.description,
       inputSchema: def.input as any,
-      strict: true,
+      // strict mode is off: the API caps strict tools at 20 and rejects large compiled grammars; Zod validates every input anyway
       execute: async (input: any) => {
         const started = Date.now();
         if (def.kind === "write") {
@@ -33,9 +33,14 @@ export function wrapTools(defs: ToolDef[], ctx: ToolContext, trace: Trace, run: 
           return { staged: true, actionId, note: "Recorded. Executes after checks pass." };
         }
         if (def.kind === "control") {
-          if (def.name === "submit_resolution") run.control.submit = input;
-          if (def.name === "reroute") run.control.reroute = input;
-          trace.log("tool.control", { tool: def.name, input });
+          const parsed = def.input.safeParse(input);
+          if (!parsed.success) {
+            trace.log("tool.control.invalid", { tool: def.name, issues: parsed.error.issues.slice(0, 5) });
+            return { accepted: false, error: "payload does not match the schema", issues: parsed.error.issues.slice(0, 5).map((i: any) => `${i.path.join(".")}: ${i.message}`), hint: "Fix the fields and call again." };
+          }
+          if (def.name === "submit_resolution") run.control.submit = parsed.data;
+          if (def.name === "reroute") run.control.reroute = parsed.data;
+          trace.log("tool.control", { tool: def.name, input: parsed.data });
           return { accepted: true };
         }
         let lastErr: unknown;

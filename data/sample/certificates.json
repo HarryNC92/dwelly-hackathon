@@ -1,0 +1,12 @@
+[
+  {"id":"CERT-301","property_id":"P-101","type":"gas_safety","issued":"2025-10-02","expires":"2026-10-02","issuer":"SafeCert Gas Services","status":"EXPIRED"},
+  {"id":"CERT-302","property_id":"P-101","type":"EICR","issued":"2022-05-10","expires":"2027-05-10","issuer":"Bright Spark Electrical","status":"valid"},
+  {"id":"CERT-303","property_id":"P-102","type":"gas_safety","issued":"2026-03-14","expires":"2027-03-14","issuer":"SafeCert Gas Services","status":"valid"},
+  {"id":"CERT-304","property_id":"P-103","type":"gas_safety","issued":"2026-01-20","expires":"2027-01-20","issuer":"Pinnacle Plumbing & Heating","status":"valid"},
+  {"id":"CERT-305","property_id":"P-103","type":"EICR","issued":"2021-11-01","expires":"2026-11-01","issuer":"Bright Spark Electrical","status":"expiring"},
+  {"id":"CERT-306","property_id":"P-105","type":"gas_safety","issued":"2026-02-28","expires":"2027-02-28","issuer":"SafeCert Gas Services","status":"valid"},
+  {"id":"CERT-307","property_id":"P-105","type":"EPC","rating":"D","issued":"2021-04-01","expires":"2031-04-01","status":"valid"},
+  {"id":"CERT-308","property_id":"P-106","type":"EICR","issued":"2024-06-15","expires":"2029-06-15","issuer":"Bright Spark Electrical","status":"valid"},
+  {"id":"CERT-309","property_id":"P-106","type":"EPC","rating":"C","issued":"2024-06-01","expires":"2034-06-01","status":"valid"},
+  {"id":"CERT-310","property_id":"P-104","type":"EICR","issued":"2025-11-01","expires":"2030-11-01","issuer":"Bright Spark Electrical","status":"valid"}
+]

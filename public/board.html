@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Case board</title>
+<style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--txt:#e8eaf0;--mut:#8b93a7;--ok:#2ecc71;--warn:#f1c40f;--bad:#e74c3c;--p0:#ff4d4f;--p1:#ffa940;--p2:#69c0ff}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto}
+header{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline}
+h1{font-size:16px;margin:0;font-weight:600}.stats{color:var(--mut)}
+main{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;transition:border-color .3s}
+.card.active{border-color:var(--warn)}.card.done{border-color:var(--ok)}.card.esc{border-color:var(--bad)}
+.id{font-weight:600;font-size:13px}.meta{color:var(--mut);font-size:12px;margin-top:4px}
+.badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;color:#000;margin-right:4px}
+.P0{background:var(--p0)}.P1{background:var(--p1)}.P2{background:var(--p2)}
+.steps{margin-top:8px;font-size:12px;color:var(--mut);max-height:120px;overflow:auto}
+.steps div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sum{margin-top:8px;font-size:12px}
+</style></head><body>
+<header><h1>Property operations · live case board</h1><div class="stats" id="stats">waiting for run…</div></header>
+<main id="main"></main>
+<script>
+const label={ "case.start":"received","route":"triaged","prefetch":"records pulled","agent.start":"agent working","tool.read":"looked up","tool.staged":"staged","tool.blocked":"blocked by guard","checks":"checks","execute.success":"executed","execute.failure":"failed","execute.unknown":"unknown result","escalate.p0.call":"📞 on-call manager rang","agent.submit":"decided","case.end":"finished" };
+async function tick(){
+  try{
+    const r=await fetch('/api/status'); const d=await r.json();
+    const main=document.getElementById('main'); main.innerHTML='';
+    let done=0,esc=0,active=0;
+    for(const c of d.cases){
+      const last=c.events[c.events.length-1]||{};
+      const state=c.status||'queued'; if(state==='running')active++; else if(state==='escalated')esc++; else if(state!=='queued')done++;
+      const el=document.createElement('div'); el.className='card '+(state==='running'?'active':state==='escalated'?'esc':state==='queued'?'':'done');
+      const urg=c.urgency?`<span class="badge ${c.urgency}">${c.urgency}</span>`:'';
+      el.innerHTML=`<div class="id">${urg}${c.id}</div><div class="meta">${c.family||''} · ${state}${c.agent?' · '+c.agent:''}</div>
+        <div class="steps">${c.events.slice(-8).map(e=>`<div>${label[e.event]||e.event}${e.tool?' · '+e.tool:''}${e.problems&&e.problems.length?' · '+e.problems.length+' issue(s)':''}</div>`).join('')}</div>
+        ${c.summary?`<div class="sum">${c.summary}</div>`:''}`;
+      main.appendChild(el);
+    }
+    document.getElementById('stats').textContent=`${d.cases.length} cases · ${active} working · ${done} done · ${esc} escalated`;
+  }catch(e){document.getElementById('stats').textContent='no data yet';}
+}
+tick(); setInterval(tick,1500);
+</script></body></html>

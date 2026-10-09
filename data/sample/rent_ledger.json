@@ -1,0 +1,8 @@
+[
+  {"id":"RL-1","tenancy_id":"TEN-2004","property_id":"P-104","period":"2026-08","due":1600,"paid":1600,"paid_on":"2026-08-01","balance":0},
+  {"id":"RL-2","tenancy_id":"TEN-2004","property_id":"P-104","period":"2026-09","due":1600,"paid":800,"paid_on":"2026-09-03","balance":-800},
+  {"id":"RL-3","tenancy_id":"TEN-2004","property_id":"P-104","period":"2026-10","due":1600,"paid":0,"paid_on":null,"balance":-2400},
+  {"id":"RL-4","tenancy_id":"TEN-2001","property_id":"P-101","period":"2026-10","due":1850,"paid":1850,"paid_on":"2026-10-01","balance":0},
+  {"id":"RL-5","tenancy_id":"TEN-2003","property_id":"P-103","period":"2026-10","due":2600,"paid":2600,"paid_on":"2026-10-01","balance":0},
+  {"id":"RL-6","tenancy_id":"TEN-2005","property_id":"P-105","period":"2026-10","due":1950,"paid":1950,"paid_on":"2026-10-01","balance":0}
+]

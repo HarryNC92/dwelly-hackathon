@@ -14,6 +14,7 @@ const RULES: { name: string; re: RegExp; minUrgency?: Flag["minUrgency"]; forced
   { name: "payment_details_change", re: /\b(bank details|account number|sort code|change (my|our|the) (bank|payment)|new bank)\b/i },
   { name: "notice_or_eviction", re: /\b(evict|section 21|section 8|serve notice|notice to quit|possession)\b/i },
   { name: "damp_or_mould", re: /\b(mould|mold|damp|condensation)\b/i },
+  { name: "possible_injection", re: /\b(ignore (all |any )?(previous|prior|above) instructions|you are (now|an?) (ai|assistant|system)|system prompt|as the (ai|agent|system),? (mark|set|close|approve)|disregard (the|your) (policy|rules))\b/i },
   { name: "security", re: /\b(break[- ]in|burglar|lock (is )?broken|cannot lock|locked out|front door (won't|will not) (lock|close))\b/i, minUrgency: "P1" },
 ];
 

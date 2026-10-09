@@ -19,6 +19,7 @@ export const AttachmentSchema = z.object({
 export const CaseSchema = z.object({
   id: z.string(),
   channel: z.string().default("unknown"),
+  kind: z.enum(["event", "question"]).default("event"),
   receivedAt: z.string().optional(),
   rawText: z.string(),
   structured: z.record(z.string(), z.unknown()).optional(),
