@@ -10,6 +10,7 @@ import path from "node:path";
  *   POST /api/webhooks/elevenlabs  post-call webhook -> writes out/<case>/callback.json
  *   GET  /                         live board (public/board.html)
  *   GET  /api/status               per-case status derived from trace files
+ *   POST /api/inbound              Twilio SMS/WhatsApp webhook (form-encoded From/Body) or JSON -> writes a case into cases/live/
  *   GET  /health
  */
 const OUT = path.resolve(process.env.OUT_DIR ?? "./ANSWERS");
@@ -71,6 +72,18 @@ http.createServer(async (req, res) => {
       const dir = path.join(OUT, String(body.case_id ?? "unknown")); fs.mkdirSync(dir, { recursive: true });
       fs.appendFileSync(path.join(dir, "calls.jsonl"), JSON.stringify({ ts: new Date().toISOString(), request: body, result }) + "\n");
       return json(res, 200, result);
+    }
+    if (req.method === "POST" && url.pathname === "/api/inbound") {
+      const raw = await readBody(req);
+      let from = "", body = "", channel = "sms";
+      if ((req.headers["content-type"] ?? "").includes("application/json")) { const j = JSON.parse(raw || "{}"); from = String(j.from ?? j.From ?? ""); body = String(j.body ?? j.Body ?? ""); channel = String(j.channel ?? "sms"); }
+      else { const p = new URLSearchParams(raw); from = p.get("From") ?? ""; body = p.get("Body") ?? ""; channel = from.startsWith("whatsapp:") ? "whatsapp" : "sms"; }
+      const id = `live-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+      const dir = path.join(process.cwd(), "cases", "live", id); fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "message.json"), JSON.stringify({ channel, received_at: new Date().toISOString(), from: from.replace(/^whatsapp:/, ""), message: body }, null, 2));
+      console.log(`inbound ${channel} from ${from}: case ${id}`);
+      // The runner picks it up: pnpm cases -- --cases ./cases/live --data ./data/<set> --out ./out/live
+      res.writeHead(200, { "content-type": "text/xml" }); return res.end("<Response></Response>");
     }
     if (req.method === "POST" && url.pathname === "/api/webhooks/elevenlabs") {
       const raw = await readBody(req);
