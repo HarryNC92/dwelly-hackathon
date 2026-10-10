@@ -87,9 +87,9 @@ const ADDR = "Flat 8, 118 Meadow Row, Alderwick, ZZ3 6ZZ";
 const baseState = (over: any = {}) => CaseStateSchema.parse({ jobId: "NBL-043-0001", propertyAddress: ADDR, stage: "landlord_gate", occupancy: "tenanted", landlordApproval: { status: "pending", eventN: 2 },
   parties: [{ role: "tenant", names: ["Isaac Quinn"], phones: ["07700 900844"], emails: [] }, { role: "landlord", names: ["Ava Rowan"] }], lastEventTs: "2026-04-13T06:45:00Z", workStatus: "not_started", ...over });
 const ruleResults: string[] = [];
-async function ruleScenario(name: string, state: any, steps: (() => any)[], expect: { blocked?: string; notBlocked?: string; check?: string; noCheck?: string }, channel = "tenant request") {
+async function ruleScenario(name: string, state: any, steps: (() => any)[], expect: { blocked?: string; notBlocked?: string; check?: string; noCheck?: string }, channel = "tenant request", rawText?: string) {
   const failures = new FailureInjector("");
-  const c = { ...mkCase(name), channel, receivedAt: state.lastEventTs, state } as any;
+  const c = { ...mkCase(name), channel, receivedAt: state.lastEventTs, state, ...(rawText ? { rawText } : {}) } as any;
   await runCase(c, { models: scripted(steps), ctxFor: (cc: any) => ({ caseId: cc.id, case: cc, store, failures, now: cc.receivedAt, env: {} }), outDir: OUT, folder: name, caseTimeoutMs: 240_000 });
   const trace = fs.readFileSync(path.join(OUT, name, "trace.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   const blocked = trace.filter((e) => e.event === "tool.blocked").map((e) => `${e.tool}: ${e.reason}`);
@@ -141,6 +141,12 @@ await ruleScenario("O-landlord-silent", baseState({ timers: { landlordReplyDue: 
 ], { check: "PM-WORKFLOW-002" });
 // P: conditional approval covers a triage visit (043) -> dispatch allowed, no spurious check
 await ruleScenario("P-conditional-covers-visit", baseState({ landlordApproval: { status: "conditional", eventN: 11, conditions: "easy and cheap fixes OK, quote if parts needed" }, stage: "dispatch" }), [() => calls([assign("Oakfield Homes", { landlord_approval_ref: "conditional: easy and cheap fixes OK" })]), () => sub({ finalState: "scheduled", rulesApplied: ["PM-AUTH-003"] })], { notBlocked: "assign_provider", noCheck: "PM-AUTH-003" });
+
+// Q: the extractor left approval pending, but the agent cites a landlord-authored event after the ask (023 "Yes that sounds like it needs sorting") -> allowed
+const packWith = (from: string) => `# Case\n### event 002 — 2025-07-25T10:00:00Z — Update — from Northbridge Lettings to Not specified\nPlease approve selection of provider and category\n### event 006 — 2025-07-25T12:00:00Z — Email — from ${from} to Northbridge Lettings\nHi Oliver\n\nYes that sounds like it needs sorting fairly soon.`;
+await ruleScenario("Q-cited-landlord-event", baseState(), [() => calls([assign("Juniper Surveying", { landlord_approval_ref: "event 6" })]), () => sub({ finalState: "scheduled" })], { notBlocked: "assign_provider" }, "tenant request", packWith("Landlord"));
+// R: the same citation pointing at a tenant-authored event is not approval
+await ruleScenario("R-cited-tenant-event", baseState(), [() => calls([assign("Juniper Surveying", { landlord_approval_ref: "event 6" }), hold]), () => okSub()], { blocked: "PM-AUTH-001" }, "tenant request", packWith("Tenant"));
 
 const fails = ruleResults.filter((r) => r.includes("FAIL"));
 console.log(`\n===== rule scenarios: ${ruleResults.length - fails.length}/${ruleResults.length} passed${fails.length ? "\n" + fails.join("\n") : ""}`);
