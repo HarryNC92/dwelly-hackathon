@@ -121,6 +121,13 @@ async function main() {
       console.error(`${folder}=${c.id}: runner failure ${String(e).slice(0, 200)}`);
     }
   };
+  // Rows for cases completed in an earlier invocation, so summary.md always covers the whole set.
+  for (const c of cases) if (!pending.includes(c)) {
+    const dir = path.join(outDir, folderOf.get(c.id)!);
+    const end = [...Trace.readSafe(path.join(dir, "trace.jsonl"))].reverse().find((e) => e.event === "case.end") as any;
+    const submit = [...Trace.readSafe(path.join(dir, "trace.jsonl"))].reverse().find((e) => e.event === "agent.submit") as any;
+    rows.push({ caseId: c.id, folder: folderOf.get(c.id)!, status: end?.status ?? "unknown", family: submit?.family, urgency: submit?.urgency, ms: Number(end?.ms ?? 0) });
+  }
   await Promise.all(chunks.map((g) => limit(async () => { for (const c of g) await runOne(c); })));
   rows.sort((a, b) => a.folder.localeCompare(b.folder, undefined, { numeric: true }));
   writeSummary(outDir, rows);

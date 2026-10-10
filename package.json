@@ -10,7 +10,8 @@
     "smoke": "tsx src/run.ts --cases ./cases/smoke --out ./out/smoke --backend local",
     "eval": "tsx src/eval.ts",
     "service": "tsx src/service.ts",
-    "judge": "tsx src/judge.ts"
+    "judge": "tsx src/judge.ts",
+    "scenarios": "tsx evals/scenarios.mts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.78",

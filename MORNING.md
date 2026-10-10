@@ -11,7 +11,7 @@ The 70 technical points are scored by a Claude judge reading per-case markdown a
 Where ambition still pays, for the human-judged 30 and the category awards: the live board plus the inbound WhatsApp loop plus the on-call phone ringing in the video. That is Stream D and E today.
 
 ## What exists and is verified
-- `pnpm smoke` runs the whole pipeline offline on a mock model in two seconds: flags, routing, staging, checks, revision, two-phase execution with an injected unknown result, reconciliation, writers.
+- `pnpm smoke` runs the whole pipeline offline on a mock model in two seconds: flags, routing, staging, checks, revision, two-phase execution with an injected unknown result, reconciliation, writers. `pnpm scenarios` runs five scripted failure scenarios through the orchestrator (all passing). Malformed inputs (binary, broken JSON, stray README) still produce folders.
 - The real model ran nine sample cases end to end at 45 to 65 seconds each with concurrency 8. The gas emergency, the break-in, water through a light fitting, arrears hardship, the expired gas certificate with refused access, the solicitor complaint, mould with a newborn and spam all resolved the way an operations manager would want. Full output is in `out/sample-1/`; read `S02-gas-smell-call/ANSWER.md` for the flavour.
 - Deterministic eval: 52 of 54 checks on those nine. The two misses were the false-booking defect.
 - The board serves live status from the trace files (`pnpm service`, http://localhost:8787).
@@ -51,7 +51,7 @@ The first real run today should be the full sixteen with the injection, then rea
 - Supplied tools. If they give an API or MCP server, the wrapper calls it; the sketch is in `src/backend/mcp.ts`. Budget an hour.
 - Rate limits on the hackathon key are unknown. The Sonnet restart and resumable runner cover a bad case; test concurrency 10 on their training set first.
 - The voice page has never been placed for real. It is fire-and-forget and the case completes without it, so the scored run is safe either way.
-- The reconciliation and claim-check path has only run against the mock model. The first real run this morning (sixteen sample cases with `--inject "book_contractor:fail:1"`) is specifically to watch S01, S04, S13 and S16 recover by booking the second contractor, and to read the judge report on them. If the reconciliation turn misbehaves, the safety net still holds: the execution status block is generated from results, and an unrecovered booking forces an escalation headed "NO CONTRACTOR CONFIRMED".
+- The reconciliation and claim-check path has not yet run against the real model, but it is verified on five scripted failure scenarios (`pnpm scenarios`: budget gate, revision duplicates, second failure, crashed reconciliation, genuine recovery), all passing. The first real run this morning (sixteen sample cases with `--inject "book_contractor:fail:1"`) is specifically to watch S01, S04, S13 and S16 recover by booking the second contractor, and to read the judge report on them. If the reconciliation turn misbehaves, the safety net still holds: the execution status block is generated from results, and an unrecovered booking forces an escalation headed "NO CONTRACTOR CONFIRMED".
 - Question-style Reality Test cases. The rules hint the test may be "difficult questions and decision points" rather than raw events. The ingest detects that shape and the answer leads with the direct answer, but it is tested on one sample case only (S14).
 
 ## Coding agents in parallel

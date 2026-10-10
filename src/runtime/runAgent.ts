@@ -63,6 +63,8 @@ Work the case: verify the records, look up anything else you need, stage the act
 
 export async function runAgent(agent: AgentConfig, c: Case, route: Route, ctx: ToolContext, models: ModelFactory, trace: Trace,
   opts: { revision?: { messages: ModelMessage[]; feedback: string; run: CaseRun }; timeoutMs?: number; modelOverride?: string; withAttachments?: boolean } = {}): Promise<AgentOutcome> {
+  const t0 = Date.now();
+  const remaining = () => Math.max(30_000, (opts.timeoutMs ?? 240_000) - (Date.now() - t0));
   const run: CaseRun = opts.revision?.run ?? { staged: [], control: {} };
   run.control = {};
   const modelId = opts.modelOverride ?? agent.model;
@@ -76,7 +78,7 @@ export async function runAgent(agent: AgentConfig, c: Case, route: Route, ctx: T
       catch (e) { trace.log("attachment.skipped", { name: a.name, reason: String(e) }); return []; }
     });
     const messages: ModelMessage[] = opts.revision
-      ? [...opts.revision.messages, { role: "user", content: `Automated checks failed: ${opts.revision.feedback}\nRevise. Your previously staged actions remain recorded; stage replacements only where needed, then call submit_resolution again.` }]
+      ? [...opts.revision.messages, { role: "user", content: opts.revision.feedback }]
       : [{ role: "user", content: [{ type: "text", text: await buildCasePack(c, route, ctx, trace), providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } } }, ...attachments] }];
     const common = { model: models(modelId), instructions, tools, providerOptions: { anthropic: { thinking: { type: "adaptive" as const }, effort: agent.effort } }, maxRetries: 4 as const };
     let result = await generateText({
@@ -91,7 +93,7 @@ export async function runAgent(agent: AgentConfig, c: Case, route: Route, ctx: T
       trace.log("agent.submit_now", { agent: agent.name, finish: result.finishReason });
       const submitOnly = wrapTools(getTools(["submit_resolution"]), ctx, trace, run);
       const nudge: ModelMessage = { role: "user", content: "You are out of steps. Call submit_resolution now with your best resolution of the case so far. Do not describe staged actions as done." };
-      result = await generateText({ ...common, tools: submitOnly, messages: [...all, nudge], stopWhen: [stepCountIs(2), submittedValidly(run)], abortSignal: AbortSignal.timeout(Math.max(30_000, Math.min(120_000, opts.timeoutMs ?? 120_000))) });
+      result = await generateText({ ...common, tools: submitOnly, messages: [...all, nudge], stopWhen: [stepCountIs(2), submittedValidly(run)], abortSignal: AbortSignal.timeout(Math.min(120_000, remaining())) });
       all = [...all, nudge, ...result.responseMessages];
     }
     if (run.control.reroute) {
@@ -111,9 +113,9 @@ export async function runAgent(agent: AgentConfig, c: Case, route: Route, ctx: T
     const msg = String(e);
     trace.log("agent.error", { agent: agent.name, error: msg.slice(0, 600) });
     const ourTimeout = /TimeoutError|operation was aborted|AbortError/i.test(msg);
-    if (!ourTimeout && opts.withAttachments !== false && c.attachments.length && /image|pdf|document|too long|prompt is too long|media/i.test(msg)) {
+    if (!ourTimeout && !opts.revision && opts.withAttachments !== false && c.attachments.length && /image|pdf|document|too long|prompt is too long|media/i.test(msg)) {
       trace.log("agent.retry_without_attachments", {});
-      return runAgent(agent, c, route, ctx, models, trace, { ...opts, withAttachments: false });
+      return runAgent(agent, c, route, ctx, models, trace, { ...opts, withAttachments: false, timeoutMs: remaining() });
     }
     return { kind: "failed", error: msg, run, modelId, retryable: !ourTimeout && /429|rate.?limit|overloaded|529|503|ECONNRESET|socket hang up|fetch failed/i.test(msg) };
   }

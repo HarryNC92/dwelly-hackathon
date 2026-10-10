@@ -14,7 +14,7 @@ export function writeAnswer(dir: string, c: Case, res: Resolution | null, run: C
   const label = (a: CaseRun["staged"][number]) => (a.status === "success" && ["propose_action", "report_blocker", "escalate"].includes(a.tool) ? "recorded for human" : a.status);
   const actionLine = (a: CaseRun["staged"][number]) => `- ${a.actionId} ${a.tool} [${label(a)}] ${clip(JSON.stringify(a.input), 400)}${a.error ? ` — ${a.error}` : ""}`;
   const statusBlock = () => {
-    const ok = run.staged.filter((a) => a.status === "success"); const bad = run.staged.filter((a) => a.status === "failure" || a.status === "unknown");
+    const ok = run.staged.filter((a) => a.status === "success" && !["propose_action", "report_blocker", "escalate"].includes(a.tool)); const bad = run.staged.filter((a) => a.status === "failure" || a.status === "unknown");
     const blocked = run.staged.filter((a) => a.status === "blocked" && !/withdrawn/.test(a.error ?? ""));
     const lines = [
       `- Executed: ${ok.length ? ok.map((a) => `${a.tool}${(a.input as any).contractor_id ? ` (${(a.input as any).contractor_id})` : ""}`).join(", ") : "nothing"}`,
@@ -43,12 +43,13 @@ ${executed.map(actionLine).join("\n") || "- none executed"}
 ${recorded.length ? `\n### Recorded for a human (not executed by the system)\n${recorded.map(actionLine).join("\n")}` : ""}
 ${failed.length ? `\n### Actions that failed or returned unknown\n${failed.map(actionLine).join("\n")}` : ""}
 ${blocked.length ? `\n### Actions blocked by guards or checks\n${blocked.map(actionLine).join("\n")}` : ""}
+${run.staged.filter((a) => a.status === "staged").length ? `\n### Proposed but not executed\n${run.staged.filter((a) => a.status === "staged").map(actionLine).join("\n")}` : ""}
 
 ## Not done and why
 ${res.notDone.map((n) => `- ${n.action}: ${n.reason}`).join("\n") || "- none"}
 
 ## Escalation
-${res.escalation.tier === "none" ? "None required." : `Tier ${res.escalation.tier}. Decision required from a human: ${String(res.escalation.decisionRequired ?? "n/a").replace(/\.$/, "")}. Reason: ${String(res.escalation.reason ?? "").replace(/\.$/, "")}.${res.escalation.deadline ? ` Deadline: ${res.escalation.deadline}.` : ""}\n\nHandover: ${res.escalation.handover ?? res.summaryForHuman}`}
+${res.escalation.tier === "none" ? "None required." : `Tier ${res.escalation.tier}. Decision required from a human: ${String(res.escalation.decisionRequired ?? "n/a").replace(/\.$/, "")}. ${res.escalation.reason ? `Reason: ${String(res.escalation.reason).replace(/\.$/, "")}.` : ""}${res.escalation.deadline ? ` Deadline: ${res.escalation.deadline}.` : ""}\n\nHandover: ${res.escalation.handover ?? res.summaryForHuman}`}
 
 ## Communications
 ${res.communications.map((m) => `- ${m.party} via ${m.channel}: ${m.gist}`).join("\n") || "- none"}

@@ -25,6 +25,7 @@ export async function executeStaged(run: CaseRun, ctx: ToolContext, trace: Trace
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         a.result = await def.perform(a.input as any, { ...ctx, actionId: a.actionId });
+        a.error = undefined;
         const newId = (a.result as any)?.id; if (typeof newId === "string") created.set(a.actionId, newId);
         a.status = "success";
         trace.log("execute.success", { actionId: a.actionId, tool: a.tool, attempt, phase });
@@ -33,7 +34,7 @@ export async function executeStaged(run: CaseRun, ctx: ToolContext, trace: Trace
         if (e instanceof UnknownResult) { a.status = "unknown"; a.error = String(e.message); trace.log("execute.unknown", { actionId: a.actionId, tool: a.tool, error: a.error, phase }); break; }
         a.status = "failure"; a.error = String((e as Error).message ?? e);
         trace.log("execute.failure", { actionId: a.actionId, tool: a.tool, attempt, error: a.error, phase });
-        if (!/timeout|ECONN|503|502|429/i.test(a.error)) break;
+        if (a.tool === "send_message" || !/timeout|ECONN|503|502|429/i.test(a.error)) break; // never risk sending a message twice
       }
     }
   }
@@ -43,7 +44,7 @@ export async function executeStaged(run: CaseRun, ctx: ToolContext, trace: Trace
 export function withdrawPendingComms(run: CaseRun, trace: Trace): string[] {
   const withdrawn: string[] = [];
   for (const a of run.staged) {
-    if (a.status === "staged" && COMMS_TOOLS.has(a.tool)) { a.status = "blocked"; a.error = "withdrawn before sending: restaged after execution results"; withdrawn.push(a.actionId); }
+    if (a.status === "staged" && a.tool === "send_message" && !/0800\s?111\s?999/.test(String((a.input as any).body ?? ""))) { a.status = "blocked"; a.error = "withdrawn before sending: restaged after execution results"; withdrawn.push(a.actionId); }
   }
   if (withdrawn.length) trace.log("reconcile.withdrawn", { withdrawn });
   return withdrawn;

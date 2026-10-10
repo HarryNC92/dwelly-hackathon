@@ -14,7 +14,7 @@ This is a one-day hackathon build (Dwelly Real-World Agents Hackathon, 10 Oct 20
 
 ## Verify before you finish
 ```bash
-pnpm typecheck && pnpm smoke                      # offline, ~2s, must stay green
+pnpm typecheck && pnpm smoke && pnpm scenarios    # offline, ~5s, must stay green
 pnpm cases -- --cases ./cases/sample --data ./data/sample --out ./out/<name> --concurrency 8   # real model, ~3-6 min
 pnpm eval -- --out ./out/<name>                   # scoreboard against evals/expected.yaml
 ```
