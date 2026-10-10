@@ -9,3 +9,4 @@ demo/*.mov
 
 # organisers public cases: cloned separately (git clone https://github.com/DwellyOrg/HackatonPublicCases)
 HackatonPublicCases/
+HackatonChallendges/

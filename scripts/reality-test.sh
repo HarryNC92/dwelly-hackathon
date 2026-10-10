@@ -5,10 +5,17 @@
 # global deadline, 4. commits ANSWERS only, 5. prints the commit hash for the form. Nothing in ANSWERS is ever hand-edited.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-DIR="${1:-HackatonPublicCases/HackatonChallendges/Property Management}"
+SRC="${1:-HackatonPublicCases/HackatonChallendges/Property Management}"
 CONC="${2:-10}"
-echo "== pulling organisers' repo"; git -C HackatonPublicCases pull -q || echo "pull failed; using the local copy"
-echo "== challenge folders:"; ls "HackatonPublicCases" ; ls "$DIR" | head -60 | tr '\n' ' '; echo
+if [[ "$SRC" == http* || "$SRC" == git@* ]]; then
+  echo "== cloning the challenge repo"; rm -rf HackatonChallendges && git clone -q --depth 1 "$SRC" HackatonChallendges
+  DIR="$(find HackatonChallendges -maxdepth 3 -type d -iname "*property*" | head -1)"
+  [ -z "$DIR" ] && { echo "no Property Management folder found; listing:"; find HackatonChallendges -maxdepth 2 -type d; exit 1; }
+else
+  DIR="$SRC"; [ -d HackatonPublicCases/.git ] && git -C HackatonPublicCases pull -q 2>/dev/null || true
+fi
+echo "== challenge directory: $DIR"
+echo "== cases:"; ls "$DIR" | head -60 | tr '\n' ' '; echo
 FIRST="$(ls "$DIR" | head -1)"
 echo "== first case layout:"; ls "$DIR/$FIRST"; echo "== index head:"; sed -n 1,40p "$DIR/$FIRST/index.md" | cut -c1-160
 echo "== if index.md has an Overview that is context (not an ending), re-run with SHOW_OUTCOME=1"
