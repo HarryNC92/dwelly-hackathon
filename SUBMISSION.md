@@ -3,7 +3,7 @@
 - Team:
 - Track: Property Management
 - Members:
-- Repository:
+- Repository: https://github.com/jeremy-shr/dwelly-hackathon
 - Code-freeze commit (17:00):
 - Reality Test results: `ANSWERS/`
 - Demo video: `demo/demo.mp4`
