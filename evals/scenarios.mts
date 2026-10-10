@@ -148,6 +148,19 @@ await ruleScenario("Q-cited-landlord-event", baseState(), [() => calls([assign("
 // R: the same citation pointing at a tenant-authored event is not approval
 await ruleScenario("R-cited-tenant-event", baseState(), [() => calls([assign("Juniper Surveying", { landlord_approval_ref: "event 6" }), hold]), () => okSub()], { blocked: "PM-AUTH-001" }, "tenant request", packWith("Tenant"));
 
+// S: the tenant is told a contractor will contact them but nothing assigns one -> check fails, the revision assigns and passes
+await ruleScenario("S-promise-without-provider", baseState({ landlordApproval: { status: "approved", eventN: 13 }, stage: "dispatch" }), [
+  () => calls([toTenant("Thank you for your report. Our contractor will contact you shortly to arrange a visit.")]),
+  () => sub({ decision: "Told the tenant a contractor will be in touch.", finalState: "scheduled" }),
+  () => calls([assign("Oakfield Homes", { landlord_approval_ref: "event 13" }), toTenant("Thank you for your report. Our maintenance provider Oakfield Homes will contact you shortly to arrange a visit.")]),
+  () => sub({ decision: "Assigned Oakfield Homes and told the tenant.", finalState: "scheduled" }),
+], { check: "PM-GEN-002" });
+// T: positive control: the same message with the provider assigned in the same resolution
+await ruleScenario("T-promise-with-provider", baseState({ landlordApproval: { status: "approved", eventN: 13 }, stage: "dispatch" }), [
+  () => calls([assign("Oakfield Homes", { landlord_approval_ref: "event 13" }), toTenant("Our maintenance provider Oakfield Homes will contact you shortly to arrange a visit.")]),
+  () => sub({ decision: "Assigned Oakfield Homes and told the tenant.", finalState: "scheduled" }),
+], { noCheck: "PM-GEN-002", notBlocked: "assign_provider" });
+
 const fails = ruleResults.filter((r) => r.includes("FAIL"));
 console.log(`\n===== rule scenarios: ${ruleResults.length - fails.length}/${ruleResults.length} passed${fails.length ? "\n" + fails.join("\n") : ""}`);
 if (fails.length) process.exitCode = 1;
