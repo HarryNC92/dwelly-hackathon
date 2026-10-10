@@ -46,8 +46,11 @@ export async function buildDwellyCase(id: string, dir: string, opts: DwellyOptio
   const details = section(index, "Case details");
   const detail = (k: string) => (details.match(new RegExp(`\\*\\*${k}:\\*\\*\\s*(.*)`))?.[1] ?? "").trim();
   const request = section(index, "Initial request");
-  const question = section(index, "Question") || section(index, "Decision point") || section(index, "Task") || section(index, "Your task");
+  const question = section(index, "Question") || section(index, "Decision point") || section(index, "Task") || section(index, "Your task") || section(index, "Questions");
   const overview = section(index, "Overview"); const outcome = section(index, "Outcome");
+  // Any other section the organisers add (e.g. "Current situation", "Constraints", "Notes for the agent") is kept verbatim.
+  const KNOWN = new Set(["case details", "initial request", "overview", "outcome", "history", "attachments", "question", "questions", "decision point", "task", "your task"]);
+  const extraSections = [...index.matchAll(/^## (.+?)\s*\n([\s\S]*?)(?=^## |(?![\s\S]))/gm)].filter((m) => !KNOWN.has(m[1].trim().toLowerCase())).map((m) => `\n## ${m[1].trim()}\n${m[2].trim()}`);
   let events = parseHistory(history);
   const cut = opts.cuts?.[id];
   if (cut) events = events.filter((e) => e.n <= cut);
@@ -62,6 +65,7 @@ export async function buildDwellyCase(id: string, dir: string, opts: DwellyOptio
   lines.push(`Source role: ${sourceRole || "unknown"} | Status at export: ${detail("Status") || "unknown"} | Created: ${created || "unknown"} | Property: ${property || "unknown"}${jobId ? ` | Job id: ${jobId}` : ""}`);
   if (request) lines.push(`\n## Initial request\n${request}`);
   if (opts.showOutcome) { if (overview) lines.push(`\n## Overview (as exported)\n${overview}`); if (outcome) lines.push(`\n## Outcome (as exported)\n${outcome}`); }
+  if (extraSections.length) lines.push(...extraSections);
   if (question) lines.push(`\n## Question\n${question}`);
   lines.push(`\n## History (${events.length} events, oldest first${cut ? `, cut at event ${cut}` : ""})`);
   for (const e of events) {

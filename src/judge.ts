@@ -13,7 +13,7 @@ import { realModels } from "./runtime/models.js";
  * It reads only what the real judge will read: the case input, ANSWER.md, REASONING.md and a trace digest.
  * Our hand-written notes in evals/expected.yaml stand in for the organisers' hidden rubric.
  */
-const o = new Command().requiredOption("--out <dir>").requiredOption("--cases <dir>").option("--expected <file>", "", "./evals/expected.yaml").option("--only <ids>").option("--report <file>").parse().opts();
+const o = new Command().requiredOption("--out <dir>").requiredOption("--cases <dir>").option("--expected <file>", "", "./evals/expected.yaml").option("--only <ids>").option("--report <file>").option("--after-dir <dir>", "directory of <id>.md files with the hidden ending of each cut case (from pnpm cut); used as the rubric when no notes exist").parse().opts();
 
 const Grade = z.object({
   outcome_score: z.number().describe("0-10: did the system reach the right resolution and take appropriate actions?"),
@@ -30,7 +30,7 @@ const SYSTEM = `You are the automated judge for an operational-AI hackathon. You
 
 async function main() {
   const models = realModels();
-  const expected = parseYaml(fs.readFileSync(o.expected, "utf8")) as Record<string, { notes?: string }>;
+  const expected = (fs.existsSync(o.expected) ? parseYaml(fs.readFileSync(o.expected, "utf8")) : {}) as Record<string, { notes?: string }>;
   const outDir = path.resolve(o.out); const casesDir = path.resolve(o.cases);
   const index: { folder: string; case_id: string }[] = JSON.parse(fs.readFileSync(path.join(outDir, "index.json"), "utf8"));
   const only = o.only ? new Set(String(o.only).split(",")) : null;
@@ -43,7 +43,10 @@ async function main() {
     const input = fs.existsSync(caseDir) && fs.statSync(caseDir).isDirectory() ? fs.readdirSync(caseDir).map((f) => `--- ${f} ---\n${fs.readFileSync(path.join(caseDir, f), "utf8")}`).join("\n") : "(see folder)";
     const trace = read("trace.jsonl").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)
       .filter((e: any) => /^(tool\.|execute\.|checks|agent\.(submit|reroute|error|fallback)|escalate)/.test(e.event)).map((e: any) => JSON.stringify({ ...e, ts: undefined, case: undefined })).join("\n").slice(0, 12000);
-    const rubric = expected[case_id]?.notes ?? "(no notes: judge from first principles as an experienced UK lettings operations manager)";
+    const afterFile = o.afterDir ? path.join(path.resolve(o.afterDir), `${case_id}.md`) : null;
+    const after = afterFile && fs.existsSync(afterFile) ? fs.readFileSync(afterFile, "utf8").slice(0, 8000) : "";
+    const rubric = expected[case_id]?.notes
+      ?? (after ? `What the agency actually did next, and how the case ended (an example of an acceptable path, not the only one; judge whether the system's next step is at least as good):\n${after}` : "(no notes: judge from first principles as an experienced UK lettings operations manager)");
     const r = await generateText({
       model: models("claude-opus-5-5"),
       instructions: SYSTEM,

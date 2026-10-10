@@ -22,7 +22,8 @@ export type AgentOutcome =
   | { kind: "failed"; error: string; run: CaseRun; retryable?: boolean; modelId: string };
 
 export function systemPrompt(agent: AgentConfig): string {
-  return [policy("constraints"), ...agent.policies.map(policy)].join("\n\n---\n\n");
+  const agency = fs.existsSync(path.join(here, "..", "policies", "agency.md")) ? [policy("agency")] : [];
+  return [policy("constraints"), ...agency, ...agent.policies.map(policy)].join("\n\n---\n\n");
 }
 
 export async function buildCasePack(c: Case, route: Route, ctx: ToolContext, trace: Trace): Promise<string> {
