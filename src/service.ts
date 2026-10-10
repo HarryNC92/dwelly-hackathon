@@ -11,7 +11,7 @@ import { sendMessage, validTwilioSignature } from "./transports/whatsapp.js";
 /**
  * Minimal HTTP service for the voice loop and inbound demo. No framework, runs anywhere, tunnel-friendly.
  *   GET  /api/cases/:id            handover pack (from the run output)
- *   POST /api/escalations          P0 page: WhatsApp alert to the on-call manager + outbound call. { case_id, to_number?, summary, decision_required, deadline, recipient_role?, property?, options?, ... } -> places the ElevenLabs outbound call
+ *   POST /api/escalations          P0: WhatsApp alert + outbound call to the on-call manager; P1: WhatsApp only. { tier, case_id, to_number?, summary, decision_required, deadline, recipient_role?, property?, options?, ... } -> places the ElevenLabs outbound call
  *   POST /api/escalations/preview  same body -> the call brief the agent would get (no call placed)
  *   POST /api/webhooks/elevenlabs  post-call webhook (HMAC verified) -> writes <OUT>/<case>/callback.json
  *   GET  /                         live board (public/board.html)
@@ -36,23 +36,23 @@ const PENDING_ALERTS = path.join(LIVE_OUT, "pending-alerts.json");
 function pendingAlerts(): Record<string, { case_id: string; dir: string; sent_at: string }> {
   try { return JSON.parse(fs.readFileSync(PENDING_ALERTS, "utf8")); } catch { return {}; }
 }
-function alertText(b: Record<string, string>): string {
+function alertText(b: Record<string, string>, tier = "P0"): string {
   const options = b.options.split(/\s*(?=Option \d+:)/).map((o) => o.replace(/^Option (\d+):\s*/, "$1) ")).filter(Boolean).join("\n");
   return [
-    `🚨 URGENT (P0): ${b.property}`,
+    tier === "P0" ? `🚨 URGENT (P0): ${b.property}` : `⚠️ Priority (P1): ${b.property}`,
     b.issue,
     `Why urgent: ${b.why_urgent}`,
     `Risk if delayed: ${b.risk_if_delayed}`,
     `Not yet confirmed: ${b.facts_uncertain}`,
     `Options:\n${options}`,
     `Recommended: ${b.recommended_option}, because ${b.recommendation_reason}.`,
-    `We are also calling you now. Reply with the option number to decide, or "call me" for a colleague. Ref ${b.case_id}`,
+    `${tier === "P0" ? "We are also calling you now. " : ""}Reply with the option number to decide, or "call me" for a colleague. Ref ${b.case_id}`,
   ].join("\n\n");
 }
 async function alertWhatsApp(body: any, dir: string) {
   const to = process.env.ONCALL_WHATSAPP_NUMBER ?? body.to_number ?? process.env.ONCALL_PHONE_NUMBER;
   if (!to || !process.env.TWILIO_WHATSAPP_FROM) return { sent: false, reason: "WhatsApp alert not configured" };
-  const result = await sendMessage("whatsapp", to, alertText(callBrief(body)));
+  const result = await sendMessage("whatsapp", to, alertText(callBrief(body), body.tier === "P1" ? "P1" : "P0"));
   if (result.ok) {
     fs.mkdirSync(LIVE_OUT, { recursive: true });
     fs.writeFileSync(PENDING_ALERTS, JSON.stringify({ ...pendingAlerts(), [to.replace(/\s/g, "")]: { case_id: String(body.case_id), dir, sent_at: new Date().toISOString() } }, null, 2));
@@ -237,7 +237,9 @@ http.createServer(async (req, res) => {
       const body = JSON.parse((await readBody(req)) || "{}");
       const dir = [OUT, LIVE_OUT].map((d) => path.join(d, String(body.case_id ?? "unknown"))).find((d) => fs.existsSync(d)) ?? path.join(OUT, String(body.case_id ?? "unknown"));
       fs.mkdirSync(dir, { recursive: true });
-      const [result, whatsapp] = await Promise.all([placeCall(body), alertWhatsApp(body, dir).catch((e) => ({ sent: false, error: String(e) }))]);
+      // P0: WhatsApp + call. P1: WhatsApp only. No tier (older callers) is treated as P0.
+      const call = body.tier === "P1" ? Promise.resolve({ placed: false, reason: "P1: WhatsApp only" }) : placeCall(body);
+      const [result, whatsapp] = await Promise.all([call, alertWhatsApp(body, dir).catch((e) => ({ sent: false, error: String(e) }))]);
       fs.appendFileSync(path.join(dir, "calls.jsonl"), JSON.stringify({ ts: new Date().toISOString(), request: body, result, whatsapp }) + "\n");
       return json(res, 200, { ...result, whatsapp });
     }
