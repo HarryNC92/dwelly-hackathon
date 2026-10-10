@@ -18,7 +18,7 @@ The Reality Test is almost certainly "here is a case so far, what happens next".
 ## Deliverables
 0. `difficulty` on the state (score 0 to 10, reasons, tier routine/standard/hard), deterministic: +3 any safety signal, +2 each data conflict touching a party or the address (cap 4), +2 a silence timer expired (landlord 3 days, provider 3+ reminders, missed visit), +2 dispute or disagreement in the last inbound, +1 missing approval at a stage that needs one, +1 more than 35 events, +1 unparseable or unavailable attachment referenced in the last three events. Tier: routine <= 2, standard 3 to 5, hard >= 6. The orchestrator uses the tier to choose model and effort; it must be stable and explainable in the rendering.
 1. `extractCaseState` and `renderCaseState` with the behaviour above.
-2. A CLI `pnpm casestate -- --case "HackatonPublicCases/Property Management/008" [--cut 20]` that prints the state as JSON and the rendering (add the script to package.json, that one line is yours).
+2. A CLI `pnpm casestate --case "HackatonPublicCases/Property Management/008" [--cut 20]` that prints the state as JSON and the rendering (add the script to package.json, that one line is yours).
 3. Expected states for eight cases and a comparison script; report precision on stage, approval status, provider, occupancy and conflicts across all fifty (run your extractor over all fifty and eyeball the distribution; it must not crash on any).
 
 ## Verify

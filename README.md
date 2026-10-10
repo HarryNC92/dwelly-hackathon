@@ -16,13 +16,13 @@ See [ARCHITECTURE.md](ARCHITECTURE.md). Short version: generic ingest → determ
 pnpm install
 cp .env.example .env        # set ANTHROPIC_API_KEY
 pnpm smoke                  # offline end-to-end check with a mock model (~2 s)
-pnpm cases -- --cases ./cases/sample --data ./data/sample --out ./out/sample --concurrency 8
-pnpm eval -- --out ./out/sample            # scoreboard vs evals/expected.yaml
-pnpm judge -- --out ./out/sample --cases ./cases/sample   # Opus grades each case like the organisers' judge
+pnpm cases --cases ./cases/sample --data ./data/sample --out ./out/sample --concurrency 8
+pnpm eval --out ./out/sample            # scoreboard vs evals/expected.yaml
+pnpm judge --out ./out/sample --cases ./cases/sample   # Opus grades each case like the organisers' judge
 ```
 Reproduce the Reality Test exactly as submitted:
 ```bash
-pnpm cases -- --cases ./cases/reality --data ./data/dwelly --out ./ANSWERS-repro --concurrency 10 --numbered
+pnpm cases --cases ./cases/reality --data ./data/dwelly --out ./ANSWERS-repro --concurrency 10 --numbered
 ```
 Live board and voice endpoints (demo only): `OUT_DIR=./out/sample pnpm service` then open http://localhost:8787.
 

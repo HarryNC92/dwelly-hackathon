@@ -40,7 +40,7 @@ for (const [id, exp] of Object.entries(expected)) {
   const failedBookings = trace.filter((e) => (e.event === "execute.failure" || e.event === "execute.unknown") && /book_contractor|create_work_order|book_inspection/.test(String(e.tool)));
   const okBookings = trace.filter((e) => e.event === "execute.success" && /book_contractor|create_work_order|book_inspection/.test(String(e.tool)));
   if (failedBookings.length && okBookings.length === 0) {
-    const claims = /## Decision\n([\s\S]*?)\n## /.exec(answer)?.[1] ?? "";
+    const claims = /## (?:Decision|Rationale|Answer)\n([\s\S]*?)\n## /.exec(answer)?.[1] ?? "";
     checks.push(["no false booking claim", !/\b(booked|on (the|their) way|will attend|is coming|has been sent|dispatched)\b/i.test(claims), "decision claims a booking that failed"]);
     checks.push(["not 'scheduled' without a booking", state !== "scheduled", "scheduled with no successful booking"]);
   }

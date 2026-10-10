@@ -20,10 +20,10 @@ The judge compares our next step with what the agency actually did. On the first
 ## Verify
 Run the fifteen-case public set before and after your changes and compare judge scores:
 ```bash
-pnpm cases -- --cases "HackatonPublicCases/Property Management" --out ./out/policy-1 --numbered --cuts evals/cuts-auto.json --only 001,004,008,010,012,015,019,020,022,030,033,038,041,047,050 --concurrency 6
-pnpm judge -- --out ./out/policy-1 --cases "HackatonPublicCases/Property Management" --cuts evals/cuts-auto.json --after-dir evals/after-auto --report ./out/policy-1-judge.md
+pnpm cases --cases "HackatonPublicCases/Property Management" --out ./out/policy-1 --numbered --cuts evals/cuts-auto.json --only 001,004,008,010,012,015,019,020,022,030,033,038,041,047,050 --concurrency 6
+pnpm judge --out ./out/policy-1 --cases "HackatonPublicCases/Property Management" --cuts evals/cuts-auto.json --after-dir evals/after-auto --report ./out/policy-1-judge.md
 ```
-Baseline is `out/public-real-2-judge.md` (mean outcome 7.3, judgement 7.4). Also `pnpm smoke` (the sample set must not regress: `pnpm cases -- --cases ./cases/sample --data ./data/sample --out ./out/policy-sample --concurrency 8` then `pnpm eval -- --out ./out/policy-sample`, baseline 92/100).
+Baseline is `out/public-real-2-judge.md` (mean outcome 7.3, judgement 7.4). Also `pnpm smoke` (the sample set must not regress: `pnpm cases --cases ./cases/sample --data ./data/sample --out ./out/policy-sample --concurrency 8` then `pnpm eval --out ./out/policy-sample`, baseline 92/100).
 
 ## Report
 Branch `stream/policy`, before and after judge means, the three verdicts that improved most and the three that got worse, and the word count of the prompt.

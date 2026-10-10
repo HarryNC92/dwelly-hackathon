@@ -7,7 +7,9 @@ Voice inside the operational workflow, an inbound channel for the demo, and a bo
 `CONTEXT.md`, `CLAUDE.md`, `VOICE-BRIEF.md` (the ElevenLabs steps, verified), `src/service.ts` (endpoints exist: board, status, cases, escalations, inbound, ElevenLabs webhook), `public/board.html`, `src/runtime/escalate.ts` (what the pipeline posts for a P0), `docs/case-breakdown.md` section 6 (safety triggers that should ring).
 
 ## You own
-`src/service.ts`, `public/*`, `voice/*`, `demo/*`, `.env.example` voice lines.
+`src/service.ts`, `public/*`, `voice/*`, `demo/*`, `.env.example` voice lines, and a new `src/transports/` if you build real message transports.
+
+Hard boundary: do not edit anything else under `src/`, `evals/` or `src/policies/`. The case pipeline never imports your files; the only link is one HTTP POST from `src/runtime/escalate.ts` to your `/api/escalations` on a P0, and that stays off during the judged run because `ESCALATION_WEBHOOK_URL` is unset for it. Work on branch `stream/voice` in your own clone or worktree; the orchestrator merges. Run `pnpm typecheck` before every report.
 
 ## Deliverables
 1. The on-call page: the ElevenLabs outbound call fires from `POST /api/escalations`, reads the handover, captures the decision via the data-collection field, and the webhook writes `callback.json` next to the case. Test with a real call to Jeremy's phone.

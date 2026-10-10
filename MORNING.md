@@ -36,23 +36,26 @@ Three independent reviews ran overnight: a judge simulation grading our nine rea
 Measured: 45 to 65 seconds per case, dominated by the agent's 6 to 10 steps on Opus 5.5. Forty cases at concurrency 10 is about five minutes, well inside the 30-minute window, so speed is not where points are. The levers if rate limits bite: lower concurrency and let the Sonnet restart handle 429s (automatic), or set `ROUTER_MODEL=claude-sonnet-5-5` for routing. Jev would make triage sub-second, which nobody scores, and its key is waitlisted. It is wired as a shadow signal only (`TYPESAFE_API_KEY`); if a key arrives it logs into the trace, nothing else changes. Do not spend time on it today.
 
 ## Scores so far on their data (judge simulator, hidden endings as rubric)
-Fifteen cut public cases: 7.3 outcome / 7.4 judgement before the case-file fixes, 7.8 / 7.9 after, no critical failures (`out/public-real-2-judge.md`, `out/public-real-3-judge.md`). Remaining miss in most verdicts: not assigning or instructing the provider at intake, which the agency does immediately. Sample set with injected booking failure: 92/100 deterministic checks, reconciliation verified live.
+Fifteen cut public cases: 7.3 outcome / 7.4 judgement at the morning baseline; 8.3 / 8.1 with the state layer and the agency policy merged, 8.3 / 7.8 with the rule guards added on top (no guard misfires on real cases), no critical failures in any run (`out/public-real-2-judge.md` to `out/public-real-8-judge.md`). Remaining miss in most verdicts: not assigning or instructing the provider at intake, which the agency does immediately. Sample set with injected booking failure: 92/100 deterministic checks, reconciliation verified live.
+
+## Reality-Test-scale timing (measured)
+All fifty cut public cases at concurrency 10: 177 seconds end to end, no errors, no deadline skips (`out/public-full-1`). Judge over all fifty: outcome 8.2, judgement 8.0, zero critical failures, 39 of 50 at 8 or above, lowest 6 (`docs/evidence/public-cases-judge-all-fifty.md`). Weakest pattern: a provider handed to a human instead of assigned, and tenants told a provider will contact them before one exists; the policy alignment and Session 1's approval-detection fix target exactly that. The 30-minute window has roughly ten times the headroom we need.
 
 ## Their data, now that we have seen it
 The public cases (fifty per track, already cloned into `HackatonPublicCases/`) are case files, not a CRM: `index.md` + `history.md` + `attachments/`, Northbridge Lettings, tenant or agency initiated, with the ending narrated in Overview and Outcome. The adapter hides those two sections, cuts histories at a decision point, and all fifty load with timestamps and numbered folders. The Reality Test will almost certainly be the same layout in a `HackatonChallendges/` folder. At 16:30: `git -C HackatonPublicCases pull`, confirm the folder name, then
 ```bash
-pnpm cases -- --cases "HackatonPublicCases/HackatonChallendges/Property Management" --out ./ANSWERS --numbered --concurrency 10 --deadline 22
+pnpm cases --cases "HackatonPublicCases/HackatonChallendges/Property Management" --out ./ANSWERS --numbered --concurrency 10 --deadline 22
 ```
 Look at one challenge `index.md` first: if it has a Question or Task section the adapter already surfaces it; if its Overview is context rather than an ending, add `--show-outcome`.
 
 ## How you test it today
 ```bash
 pnpm smoke && pnpm scenarios                                 # offline sanity, run after every merge
-pnpm cases -- --cases ./cases/sample --data ./data/sample --out ./out/<name> --concurrency 8 --inject "book_contractor:fail:1"
+pnpm cases --cases ./cases/sample --data ./data/sample --out ./out/<name> --concurrency 8 --inject "book_contractor:fail:1"
 pnpm eval  -- --out ./out/<name>                             # scoreboard
-pnpm cut -- --src "HackatonPublicCases/Property Management"  # decision points + hidden endings for labelling
-pnpm cases -- --cases "HackatonPublicCases/Property Management" --out ./out/public-<name> --numbered --cuts evals/cuts-auto.json --only 003,027,045
-pnpm judge -- --out ./out/<name> --cases ./cases/sample --report ./out/<name>-judge.md   # Opus grades like the organisers
+pnpm cut --src "HackatonPublicCases/Property Management"  # decision points + hidden endings for labelling
+pnpm cases --cases "HackatonPublicCases/Property Management" --out ./out/public-<name> --numbered --cuts evals/cuts-auto.json --only 003,027,045
+pnpm judge --out ./out/<name> --cases ./cases/sample --report ./out/<name>-judge.md   # Opus grades like the organisers
 ```
 The first real run today should be the full sixteen with the injection, then read the judge report, then open their data.
 

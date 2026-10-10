@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { ToolDef } from "./types.js";
+import type { ToolDef, ToolContext } from "./types.js";
+import { guardRules, formatHit } from "../runtime/rules.js";
+
+/** Triage rules (docs/triage-rules.md) read the extracted case state; no state means no rule applies. */
+const ruleGuard = (tool: string, input: unknown, ctx: ToolContext): string | null => { const h = guardRules(tool, input, ctx.case?.state, { channel: ctx.case?.channel, now: ctx.now, rawText: ctx.case?.rawText }); return h ? formatHit(h) : null; };
 
 /**
  * Every write is staged at request time and performed only after checks pass.
@@ -19,6 +23,7 @@ export const updateTicket: ToolDef = {
   name: "update_ticket", kind: "write", risk: "low",
   description: "Update the status of, or add a note to, a ticket or job (use the case's Job Id for the case itself).",
   input: z.object({ ticket_id: z.string().describe("Ticket or job id, e.g. the case's Job Id"), status: z.string().optional(), note: z.string().optional() }),
+  guard: async (i, ctx) => ruleGuard("update_ticket", i, ctx),
   perform: async (i, ctx) => {
     const existing = await ctx.store.get("tickets", i.ticket_id);
     if (!existing) return ctx.store.upsert("tickets", i.ticket_id, { status: i.status ?? "open", notes: [{ note: i.note, ...stamp(ctx) }], ...stamp(ctx) }); // the case's own job id, not yet in our store
@@ -29,17 +34,18 @@ export const updateTicket: ToolDef = {
 
 export const createWorkOrder: ToolDef = {
   name: "create_work_order", kind: "write", risk: "high",
-  description: "Instruct work on a property. Requires an estimated cost; spend above landlord authority without a recorded approval is refused.",
+  description: "Instruct work on a property. Requires an estimated cost; spend above landlord authority without a recorded approval is refused. Refused before landlord approval (PM-AUTH-001), while a quote is with the landlord (PM-AUTH-002), or for parts under a conditional approval (PM-AUTH-003).",
   input: z.object({ property_id: z.string().describe("Property id, or the address as it appears in the case"), ticket_id: z.string().optional(), contractor_id: z.string().optional().describe("Panel id, or the contractor's name as it appears in the case"), scope: z.string(), estimated_cost_gbp: z.number(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record, or the history event in which the landlord approved (e.g. 'event 006')"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
-  guard: async (i, ctx) => spendGuard(i.property_id, i.estimated_cost_gbp, i.approval_ref, ctx, i.emergency, i.emergency_justification),
+  guard: async (i, ctx) => ruleGuard("create_work_order", i, ctx) ?? spendGuard(i.property_id, i.estimated_cost_gbp, i.approval_ref, ctx, i.emergency, i.emergency_justification),
   perform: async (i, ctx) => ctx.store.upsert("work_orders", rid("WO", ctx), { ...i, status: "instructed", ...stamp(ctx) }),
 };
 
 export const bookContractor: ToolDef = {
   name: "book_contractor", kind: "write", risk: "high",
-  description: "Instruct or book a contractor for a slot or next available visit. Use a panel contractor id when a panel exists; when the case file is the system of record, use the contractor named in the case (id or name) and they count as approved.",
+  description: "Instruct or book a contractor for a slot or next available visit. Use a panel contractor id when a panel exists; when the case file is the system of record, use the contractor named in the case (id or name) and they count as approved. Refused before landlord approval unless the landlord pre-authorised, the agency raised the job, or emergency=true with a safety signal (PM-AUTH-001); refused while a quote is with the landlord (PM-AUTH-002) and for a second contractor on a job that already has one (PM-AUTH-005).",
   input: z.object({ contractor_id: z.string().describe("Panel contractor id, or the contractor's name exactly as it appears in the case"), property_id: z.string().describe("Property id, or the address as it appears in the case"), slot: z.string().describe("ISO datetime, window, or 'next available'"), scope: z.string(), estimated_cost_gbp: z.number().optional(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record that approves this spend"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
   guard: async (i, ctx) => {
+    const rule = ruleGuard("book_contractor", i, ctx); if (rule) return rule;
     const c = await ctx.store.get("contractors", i.contractor_id);
     const panelKnown = (await ctx.store.list("contractors", 1)).length > 0;
     if (!c && panelKnown) return `contractor ${i.contractor_id} is not on the approved panel`;
@@ -59,9 +65,9 @@ export const bookContractor: ToolDef = {
 
 export const sendMessage: ToolDef = {
   name: "send_message", kind: "write", risk: "low",
-  description: "Send a message to a tenant, landlord or contractor. Never commit the landlord to money or a legal position; never share more tenant data than the job needs.",
+  description: "Send a message to a tenant, landlord or contractor. Never commit the landlord to money or a legal position; never share more tenant data than the job needs. Refused when the body quotes a different property (PM-DATA-001), sends tenant contact details to anyone but the assigned contractor without consent (PM-PRIV-001), goes to a tenant at a property recorded as not tenanted (PM-OCC-001), or deducts from rent or bills the tenant without the route being approved (PM-LIAB-002).",
   input: z.object({ to_party: z.enum(["tenant", "landlord", "contractor", "other"]), to_ref: z.string().describe("Record id or contact as held on file"), channel: z.enum(["email", "sms", "whatsapp", "portal"]), subject: z.string().optional(), body: z.string(), attachments: z.array(z.string()).optional().describe("Names of case attachments to send with the message, exactly as listed in the case (e.g. attachment-02-estimate.pdf)") }),
-  guard: async (i) => /\b((we|the landlord|your landlord) will (pay|refund|compensate|reimburse|reduce)|compensat\w*|rent (reduction|rebate|holiday)|section (8|21)|notice (to quit|seeking possession|to leave)|rent increase|evict\w*|you (must|have to|need to) (leave|move out|vacate))\b/i.test(i.body) ? "message commits the landlord to money or a legal position (compensation, rent change, notices, eviction)" : null,
+  guard: async (i, ctx) => ruleGuard("send_message", i, ctx) ?? (/\b((we|the landlord|your landlord) will (pay|refund|compensate|reimburse|reduce)|compensat\w*|rent (reduction|rebate|holiday)|section (8|21)|notice (to quit|seeking possession|to leave)|rent increase|evict\w*|you (must|have to|need to) (leave|move out|vacate))\b/i.test(i.body) ? "message commits the landlord to money or a legal position (compensation, rent change, notices, eviction)" : null),
   perform: async (i, ctx) => {
     const f = ctx.failures.take("send_message");
     if (f === "fail") throw new Error("delivery failed: address rejected");
@@ -82,6 +88,7 @@ export const recordLandlordDecision: ToolDef = {
   name: "record_landlord_decision", kind: "write", risk: "low",
   description: "Record a decision the landlord has communicated (approval, refusal, instruction) with its source.",
   input: z.object({ landlord_id: z.string(), decision: z.string(), source: z.string().describe("Where the decision came from, e.g. email dated X") }),
+  guard: async (i, ctx) => ruleGuard("record_landlord_decision", i, ctx),
   perform: async (i, ctx) => ctx.store.upsert("landlord_decisions", rid("LD", ctx), { ...i, ...stamp(ctx) }),
 };
 
@@ -108,9 +115,9 @@ export const escalate: ToolDef = {
 
 export const assignProvider: ToolDef = {
   name: "assign_provider", kind: "write", risk: "low",
-  description: "The agency's normal dispatch step ('Maintenance provider assigned'): assign the contractor who will attend, by panel id or by the name used in the case, once the landlord gate allows it. This is your job, not a human's; do not propose it for someone else. Follow it with the templated contractor and tenant messages.",
+  description: "The agency's normal dispatch step ('Maintenance provider assigned'): assign the contractor who will attend, by panel id or by the name used in the case, once the landlord gate allows it. This is your job, not a human's; do not propose it for someone else. Follow it with the templated contractor and tenant messages. Allowed when the landlord approved (message or 'Landlord approval confirmed'), pre-authorised conditionally, or the agency raised the job; refused otherwise (PM-AUTH-001), when the landlord chose their own contractor or a self-fix (PM-AUTH-004), or when another provider is already on the job unless the scope says comparison quote or replacement (PM-AUTH-005).",
   input: z.object({ provider: z.string().optional().describe("Contractor name as used in the case or panel id; leave empty to assign the agency's panel contractor for the trade, exactly as the platform's 'Maintenance provider assigned' step does"), trade: z.string().optional().describe("Trade needed, e.g. plumber, electrician, glazier, cleaner; required when no provider is named"), property: z.string(), scope: z.string(), landlord_approval_ref: z.string().optional().describe("History event or decision id showing approval, or 'conditional: <wording>' or 'not required: <why>'") }),
-  guard: async (i) => (!i.provider && !i.trade ? "name the provider or the trade to assign" : null),
+  guard: async (i, ctx) => (!i.provider && !i.trade ? "name the provider or the trade to assign" : null) ?? ruleGuard("assign_provider", i, ctx),
   perform: async (i, ctx) => ctx.store.upsert("assignments", rid("AS", ctx), { ...i, provider: i.provider ?? `panel ${i.trade}`, status: "assigned", ...stamp(ctx) }),
 };
 
@@ -130,9 +137,9 @@ export const setHold: ToolDef = {
 
 export const closeCase: ToolDef = {
   name: "close_case", kind: "write", risk: "low",
-  description: "Close the case when the work is genuinely complete and every party has what they need. Not for cases with open questions, unpaid invoices awaiting a decision, or unknown results.",
+  description: "Close the case when the work is genuinely complete and every party has what they need. Not for cases with open questions, unpaid invoices awaiting a decision, or unknown results. Refused with an open safety signal (PM-SAFE-002), an unresolved address or name conflict or an open quote (PM-CLOSE-001), keys issued and not returned (PM-KEY-001), no completion evidence (PM-DOC-001), or a referenced invoice not on file; say in the reason how each was resolved if it was.",
   input: z.object({ reason: z.string(), outcome: z.string() }),
-  guard: async (i) => /unknown|not sure|pending|awaiting|unconfirmed/i.test(i.reason) ? "do not close a case with an unresolved or unknown element; escalate or hold instead" : null,
+  guard: async (i, ctx) => ruleGuard("close_case", i, ctx) ?? (/unknown|not sure|pending|awaiting|unconfirmed/i.test(i.reason) ? "do not close a case with an unresolved or unknown element; escalate or hold instead" : null),
   perform: async (i, ctx) => ctx.store.upsert("closures", rid("CL", ctx), { ...i, status: "closed", ...stamp(ctx) }),
 };
 

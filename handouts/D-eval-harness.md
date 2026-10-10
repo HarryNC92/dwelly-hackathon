@@ -19,7 +19,7 @@ Every prompt or rule change today must be measured, or we will ship regressions 
 4. `src/judge.ts`: a rubric block built from the breakdown (section 4 rules, section 6 escalation triggers and red flags) added to the system prompt; per-cut scoring; a markdown dashboard that lists the ten worst cuts with the verdicts.
 
 ## Verify
-`pnpm typecheck && pnpm smoke && pnpm scenarios`; run the linter over `out/public-real-2` and `out/sample-2` and report findings; run the multi-cut materialiser and confirm the runner loads the folders with the mock model (`pnpm cases -- --cases ./cases/public-cuts --out ./out/cuts-mock --mock-model`).
+`pnpm typecheck && pnpm smoke && pnpm scenarios`; run the linter over `out/public-real-2` and `out/sample-2` and report findings; run the multi-cut materialiser and confirm the runner loads the folders with the mock model (`pnpm cases --cases ./cases/public-cuts --out ./out/cuts-mock --mock-model`).
 
 ## Report
 Branch `stream/eval`, linter findings on the two existing runs, number of cuts produced, and the commands the team should use from now on.

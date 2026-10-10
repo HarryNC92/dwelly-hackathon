@@ -2,7 +2,7 @@
 
 This note is an inference from the public Dwelly Property Management practice cases. It is not an actual contract, legal advice, or evidence that these terms exist in a signed landlord-agency agreement. The dataset does not include landlord management agreements, terms of business, rent collection mandates, privacy notices, or contractor framework agreements.
 
-For the operational rules that should be applied to new, unseen triage cases, see `generalised-triage-rules.md`. This file is the supporting interpretation; the generalised rule set is the agent policy.
+For the operational rules that should be applied to new, unseen triage cases, see `triage-rules.md`. This file is the supporting interpretation; the generalised rule set is the agent policy.
 
 What it does include is a repeated operating pattern. Across the cases, Northbridge Lettings behaves as a property management agent with limited delegated authority: it can triage, coordinate, communicate, chase, document and close maintenance requests, but landlord approval remains the key control point for dispatching contractors, approving quoted works, choosing who does the work, and deciding some cost/liability questions.
 

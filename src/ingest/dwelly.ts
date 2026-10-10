@@ -47,10 +47,11 @@ export async function buildDwellyCase(id: string, dir: string, opts: DwellyOptio
   const details = section(index, "Case details");
   const detail = (k: string) => (details.match(new RegExp(`\\*\\*${k}:\\*\\*\\s*(.*)`))?.[1] ?? "").trim();
   const request = section(index, "Initial request");
-  const question = section(index, "Question") || section(index, "Decision point") || section(index, "Task") || section(index, "Your task") || section(index, "Questions");
+  const question = section(index, "Question") || section(index, "Questions") || section(index, "Decision point") || section(index, "Task") || section(index, "Your task")
+    || section(index, "Next action at escalation") || section(index, "Next action") || section(index, "Escalation") || section(index, "What should happen next");
   const overview = section(index, "Overview"); const outcome = section(index, "Outcome");
   // Any other section the organisers add (e.g. "Current situation", "Constraints", "Notes for the agent") is kept verbatim.
-  const KNOWN = new Set(["case details", "initial request", "overview", "outcome", "history", "attachments", "question", "questions", "decision point", "task", "your task"]);
+  const KNOWN = new Set(["case details", "initial request", "overview", "outcome", "history", "attachments", "question", "questions", "decision point", "task", "your task", "next action at escalation", "next action", "escalation", "what should happen next"]);
   const extraSections = [...index.matchAll(/^## (.+?)\s*\n([\s\S]*?)(?=^## |(?![\s\S]))/gm)].filter((m) => !KNOWN.has(m[1].trim().toLowerCase())).map((m) => `\n## ${m[1].trim()}\n${m[2].trim()}`);
   let events = parseHistory(history);
   const cut = opts.cuts?.[id];
@@ -67,7 +68,7 @@ export async function buildDwellyCase(id: string, dir: string, opts: DwellyOptio
   if (request) lines.push(`\n## Initial request\n${request}`);
   if (opts.showOutcome) { if (overview) lines.push(`\n## Overview (as exported)\n${overview}`); if (outcome) lines.push(`\n## Outcome (as exported)\n${outcome}`); }
   if (extraSections.length) lines.push(...extraSections);
-  if (question) lines.push(`\n## Question\n${question}`);
+  if (question) lines.push(`\n## The task set by the organisers (answer this first: the next action and the rationale)\n${question}`);
   lines.push(`\n## History (${events.length} events, oldest first${cut ? `, cut at event ${cut}` : ""})`);
   for (const e of events) {
     lines.push(`\n### event ${String(e.n).padStart(3, "0")} — ${e.ts || "time unknown"} — ${e.channel || "?"} — from ${e.from || "?"} to ${e.to || "?"}`);
