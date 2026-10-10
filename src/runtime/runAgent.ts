@@ -11,13 +11,9 @@ import { wrapTools, type CaseRun } from "./wrapper.js";
 import type { ModelFactory } from "./models.js";
 import type { Trace } from "./trace.js";
 import { prefetchContext, renderPrefetch } from "./context.js";
+import { renderCaseState } from "../casefile/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-/** Generic rendering until stream A ships renderCaseState; keeps only non-empty fields. */
-function renderState(state: Record<string, unknown>): string {
-  const keep = Object.entries(state).filter(([, v]) => v != null && !(Array.isArray(v) && v.length === 0) && !(typeof v === "object" && !Array.isArray(v) && Object.keys(v as object).length === 0));
-  return keep.map(([k, v]) => `- ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("\n").slice(0, 6000);
-}
 const policy = (name: string) => fs.readFileSync(path.join(here, "..", "policies", `${name}.md`), "utf8");
 const submittedValidly = (run: CaseRun): StopCondition<ToolSet> => () => run.control.submit !== undefined || run.control.reroute !== undefined;
 
@@ -50,7 +46,7 @@ export async function buildCasePack(c: Case, route: Route, ctx: ToolContext, tra
   const kindNote = c.kind === "question"
     ? "This case is phrased as a question or decision point rather than a raw inbound event. Answer it directly in `decision` (first sentence = the answer), then still stage any actions the answer implies."
     : "This case is an inbound event. Work it as the property manager on duty.";
-  const stateBlock = c.state ? `\n## Case state (extracted deterministically from the history; verify against the events before relying on it)\n${renderState(c.state)}\n` : "";
+  const stateBlock = c.state ? `\n## Case state (extracted deterministically from the history; verify against the events before relying on it)\n${renderCaseState(c.state)}\n` : "";
   return `# Case ${c.id}
 Channel: ${c.channel}
 Case time ("now", UTC): ${c.receivedAt ?? `unknown; use the run reference time ${ctx.now}`}. Write times in messages as Europe/London local time.

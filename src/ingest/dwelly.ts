@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { CaseSchema, type Case } from "../schemas/case.js";
 import { computeFlags } from "../runtime/flags.js";
+import { extractCaseState } from "../casefile/index.js";
 
 /**
  * Adapter for the organisers' case format (github.com/DwellyOrg/HackatonPublicCases):
@@ -97,10 +98,12 @@ export async function buildDwellyCase(id: string, dir: string, opts: DwellyOptio
   const linkedIds: Record<string, string> = {};
   if (jobId) linkedIds.job_id = jobId;
   if (property) linkedIds.property_address = property;
+  // Deterministic case state (stream A): stage, parties, approvals, quotes, holds, timers, conflicts, safety, difficulty. Never throws.
+  const state = await extractCaseState(events, { jobId, propertyAddress: property, sourceRole, created, title }, extra);
   const c = CaseSchema.parse({
     id, channel: sourceRole ? `${sourceRole.toLowerCase()} request` : "case-file", kind: question ? "question" : "event", receivedAt: lastTs,
     rawText: rawText + extra, structured: { format: "case-file", title, source_role: sourceRole, status: detail("Status"), created, property, job_id: jobId ?? null, events: events.length, cut: cut ?? null },
-    attachments, linkedIds, sourceFiles: ["index.md", "history.md", ...attachments.map((a) => `attachments/${a.name}`)], flags: [],
+    attachments, linkedIds, sourceFiles: ["index.md", "history.md", ...attachments.map((a) => `attachments/${a.name}`)], flags: [], state,
   });
   c.flags = computeFlags(c.rawText);
   return c;
