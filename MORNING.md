@@ -41,18 +41,18 @@ Fifteen cut public cases: 7.3 outcome / 7.4 judgement at the morning baseline; 8
 ## Their data, now that we have seen it
 The public cases (fifty per track, already cloned into `HackatonPublicCases/`) are case files, not a CRM: `index.md` + `history.md` + `attachments/`, Northbridge Lettings, tenant or agency initiated, with the ending narrated in Overview and Outcome. The adapter hides those two sections, cuts histories at a decision point, and all fifty load with timestamps and numbered folders. The Reality Test will almost certainly be the same layout in a `HackatonChallendges/` folder. At 16:30: `git -C HackatonPublicCases pull`, confirm the folder name, then
 ```bash
-pnpm cases -- --cases "HackatonPublicCases/HackatonChallendges/Property Management" --out ./ANSWERS --numbered --concurrency 10 --deadline 22
+pnpm cases --cases "HackatonPublicCases/HackatonChallendges/Property Management" --out ./ANSWERS --numbered --concurrency 10 --deadline 22
 ```
 Look at one challenge `index.md` first: if it has a Question or Task section the adapter already surfaces it; if its Overview is context rather than an ending, add `--show-outcome`.
 
 ## How you test it today
 ```bash
 pnpm smoke && pnpm scenarios                                 # offline sanity, run after every merge
-pnpm cases -- --cases ./cases/sample --data ./data/sample --out ./out/<name> --concurrency 8 --inject "book_contractor:fail:1"
+pnpm cases --cases ./cases/sample --data ./data/sample --out ./out/<name> --concurrency 8 --inject "book_contractor:fail:1"
 pnpm eval  -- --out ./out/<name>                             # scoreboard
-pnpm cut -- --src "HackatonPublicCases/Property Management"  # decision points + hidden endings for labelling
-pnpm cases -- --cases "HackatonPublicCases/Property Management" --out ./out/public-<name> --numbered --cuts evals/cuts-auto.json --only 003,027,045
-pnpm judge -- --out ./out/<name> --cases ./cases/sample --report ./out/<name>-judge.md   # Opus grades like the organisers
+pnpm cut --src "HackatonPublicCases/Property Management"  # decision points + hidden endings for labelling
+pnpm cases --cases "HackatonPublicCases/Property Management" --out ./out/public-<name> --numbered --cuts evals/cuts-auto.json --only 003,027,045
+pnpm judge --out ./out/<name> --cases ./cases/sample --report ./out/<name>-judge.md   # Opus grades like the organisers
 ```
 The first real run today should be the full sixteen with the injection, then read the judge report, then open their data.
 

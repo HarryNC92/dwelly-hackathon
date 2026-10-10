@@ -29,7 +29,7 @@ Checks (on the resolution):
 Flags (patterns over the raw text, hints with minimum urgency): door glass may shatter, water near a smoke detector or electrics, scalding, door or window that will not lock or open on an escape route, rotting door, no isolation valves, leak known for more than two weeks (compute from dates when possible).
 
 ## Verify
-`pnpm typecheck && pnpm smoke && pnpm scenarios`; add scripted scenarios for at least six rules to `evals/scenarios.mts` (the orchestrator will merge; keep them at the bottom of the file in a clearly marked block); then a real run on cut public cases 006, 008, 013, 020, 043, 045, 047, 048 with `pnpm cases -- --cases "HackatonPublicCases/Property Management" --out ./out/rules-1 --numbered --cuts evals/cuts-auto.json --only 006,008,013,020,043,045,047,048` and `pnpm judge` on that output; report the judge delta against `out/public-real-2-judge.md` where the cases overlap.
+`pnpm typecheck && pnpm smoke && pnpm scenarios`; add scripted scenarios for at least six rules to `evals/scenarios.mts` (the orchestrator will merge; keep them at the bottom of the file in a clearly marked block); then a real run on cut public cases 006, 008, 013, 020, 043, 045, 047, 048 with `pnpm cases --cases "HackatonPublicCases/Property Management" --out ./out/rules-1 --numbered --cuts evals/cuts-auto.json --only 006,008,013,020,043,045,047,048` and `pnpm judge` on that output; report the judge delta against `out/public-real-2-judge.md` where the cases overlap.
 
 ## Report
 Branch `stream/rules`, the rule table, scenario results, judge delta, and any CaseState fields you needed that do not exist.
