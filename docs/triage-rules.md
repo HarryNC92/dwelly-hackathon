@@ -1,6 +1,6 @@
 # Triage rules for new maintenance cases (Harry, derived from the public cases)
 
-Operational policy for triage and next-action selection on unseen cases. Evidence: the public Dwelly Property Management cases. Companion notes: `landlord-agency-contract-inferences.md` (to be added by Harry).
+Operational policy for triage and next-action selection on unseen cases. Evidence: the public Dwelly Property Management cases. Companion notes: `landlord-agency-contract-inferences.md`.
 
 ## Goal
 Given a maintenance case so far, choose one safe next action: send a message; request approval; assign or chase a provider; hold and wait; escalate to a human or on-call manager; close if close-out requirements are complete; do nothing yet because the correct timer has not expired. The answer should include the action, recipient, message or instruction where relevant, and the reasons and evidence used.
