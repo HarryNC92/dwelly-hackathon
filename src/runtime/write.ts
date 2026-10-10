@@ -33,13 +33,13 @@ export function writeAnswer(dir: string, c: Case, res: Resolution | null, run: C
 
   const answer = res ? `# Case ${c.id}
 
-${statusBlock()}
-
 ## Next action
 ${res.nextAction ? `${res.nextAction.type} → ${res.nextAction.recipient} (stage: ${res.nextAction.stage}; confidence ${res.nextAction.confidence}${res.rulesApplied?.length ? `; rules ${res.rulesApplied.join(", ")}` : ""})` : `${res.finalState}; see the actions below`}
 
 ## Rationale
 ${res.decision}
+
+${statusBlock()}
 
 ## Actions taken
 ${executed.map(actionLine).join("\n") || "- none executed"}
