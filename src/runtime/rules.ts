@@ -24,6 +24,7 @@ export function landlordAuthoredEvent(rawText: string | undefined, n: number): b
 type Run = { staged: StagedAction[] };
 
 export const RULE_TABLE: { id: string; precedence: number; title: string; severity: Severity; sources: string }[] = [
+  { id: "PM-GEN-002", precedence: 0, title: "A tenant promised a provider needs a provider assigned in the same resolution", severity: "block", sources: "orchestrator, all-fifty run" },
   { id: "PM-SAFE-001", precedence: 1, title: "Safety overrides routine workflow", severity: "warn", sources: "014, 015, 023, 031, 034, 035, 040, 044" },
   { id: "PM-SAFE-002", precedence: 1, title: "Do not close with an unresolved safety risk", severity: "block", sources: "breakdown §6" },
   { id: "PM-DATA-001", precedence: 2, title: "Property identity conflicts block outbound messages", severity: "block", sources: "005, 006, 008, 009, 015, 022, 028, 032-034, 037, 038, 045, 048" },
@@ -61,6 +62,23 @@ const DEFINITE_CHARGE = /\b(?:you will be (?:charged|billed|invoiced|liable)|we 
 const INVOICE_US = /\b(?:invoice (?:us|the agency|northbridge)|send (?:the|your) invoice to (?:us|the agency)|we will (?:pay|settle) (?:the|your) invoice|the landlord will pay)\b/i;
 const NO_ISSUES = /\b(?:no (?:issues|problems|defects|concerns|damage)|all (?:fine|good|ok|in order)|nothing to report|in good (?:order|condition))\b/i;
 const DONE_CLAIM = /\b(?:has been (?:completed|repaired|fixed|replaced|resolved)|have been (?:completed|repaired|fixed|replaced)|work (?:is|was) (?:done|complete|completed)|works? (?:are|is) (?:now )?complete|job (?:is )?(?:done|complete|completed)|repair (?:is |was )?(?:complete|completed|done)|(?:is|was|been) (?:now )?fixed|issue (?:is|has been) resolved)\b/i;
+const PROVIDER_WORD = "(?:provider|contractor|engineer|plumber|electrician|handyman|cleaner|locksmith|glazier|gardener|roofer|technician|[A-Z][a-z]+ (?:Services|Works|Solutions|Utilities|Homes|Surveying|Compliance|Maintenance))";
+const PROVIDER_PROMISE = new RegExp(`\\b${PROVIDER_WORD}\\b[^.]{0,60}\\b(?:will (?:contact|call|phone|be in touch|get in touch|attend|visit|come|arrange|reach out)|is attending|are attending|is on (?:the|their|his|her) way|are on (?:the|their) way|has been (?:assigned|instructed|booked|appointed)|have been (?:assigned|instructed|booked)|is booked|will be attending|is coming)|(?:we have|we've|we) (?:now )?(?:assigned|instructed|booked|arranged for|appointed) (?:a |an |our |the )?${PROVIDER_WORD}`, "i");
+const PROMISE_HEDGE = /\b(?:once|if|when|after|subject to|pending|should|provided|as soon as the landlord|awaiting|cannot|can'?t|not yet|no provider|unable)\b/i;
+
+/** Promises to the tenant that a provider is coming need a provider: a live assign_provider or book_contractor in this resolution, or one already assigned in the case. */
+export function providerPromiseRule(run: Run, state?: CaseState): RuleHit | null {
+  const live = run.staged.filter((a) => a.status === "staged" || a.status === "success");
+  const assigned = live.some((a) => a.tool === "assign_provider" || a.tool === "book_contractor") || (!!state?.providerAssigned && state.workStatus !== "work_completed");
+  if (assigned) return null;
+  for (const a of live) {
+    if (a.tool !== "send_message" || (a.input as any).to_party !== "tenant") continue;
+    const promise = String((a.input as any).body ?? "").split(/(?<=[.!?])\s+|\n+/).find((s) => PROVIDER_PROMISE.test(s) && !PROMISE_HEDGE.test(s));
+    if (promise) return { id: "PM-GEN-002", severity: "block", defaultAction: "assign_provider", reason: `tenant promised a provider but none is assigned ("${promise.trim().slice(0, 100)}").` };
+  }
+  return null;
+}
+
 const NOT_CLAIM = /\b(?:once|when|after|if|will|until|should|not|hasn'?t|has not|yet to|awaiting|confirm(?:ed)? (?:that|whether)|reports? that|says?|said|claims?|told us|let us know|informed us|advised(?: us)?|according to|states?|(?:tenant|landlord|contractor|provider)s? (?:has |have )?(?:said|says|reported|confirmed|advised|let|told|mentioned))\b/i;
 
 function consentOnFile(state: CaseState): boolean {
@@ -162,8 +180,9 @@ export function guardRules(tool: string, input: any, state: CaseState | undefine
 
 /** Rule hits on a proposed resolution. Blocks are always problems; warns are problems unless addressed. */
 export function resolutionRules(state: CaseState | undefined, res: Resolution, run: Run, info: CaseInfo = {}): RuleHit[] {
-  if (!state) return [];
   const hits: RuleHit[] = [];
+  const promise = providerPromiseRule(run, state); if (promise) hits.push(promise);
+  if (!state) return hits;
   const live = run.staged.filter((a) => a.status === "staged" || a.status === "success");
   const has = (tool: string, pred: (i: any) => boolean = () => true) => live.some((a) => a.tool === tool && pred(a.input));
   const outgoing = live.filter((a) => a.tool === "send_message");
