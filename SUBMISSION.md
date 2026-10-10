@@ -24,7 +24,7 @@
 ## Reality Test Command
 
 ```bash
-scripts/reality-test.sh "HackatonPublicCases/HackatonChallendges/Property Management" 10
+scripts/reality-test.sh <challenge-repo-url> 10
 ```
 
-The script prints the commit hash to use in the submission form after committing generated `ANSWERS/`.
+The organisers publish the challenge repository URL at 16:30. The script clones it, runs the Property Management cases, and prints the commit hash to use in the submission form after committing generated `ANSWERS/`.
