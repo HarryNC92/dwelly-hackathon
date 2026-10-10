@@ -1,0 +1,15 @@
+{
+  "case_id": "PM-035",
+  "recipient_role": "property_manager",
+  "recipient_name": "Theo",
+  "property": "Flat 23, 63 Meadow Row, Bellmere",
+  "tenant_name": "the tenant",
+  "issue": "The tenant reported a loose shower hose and low pressure. On a later call it came out that water has damaged the ceiling and is affecting a smoke detector. Nobody has followed that up yet.",
+  "why_urgent": "A smoke detector affected by water may not work, which is a fire-safety risk, and a water-damaged ceiling can come down.",
+  "risk_if_delayed": "No working smoke alarm overnight, and possible ceiling collapse if the leak continues.",
+  "facts_uncertain": "We don't know if the leak is still active or if the detector has actually failed. No photos are available.",
+  "options": "Option 1: send a plumber and an electrician today to stop the leak and test or replace the smoke detector. Option 2: you attend yourself today to inspect and make safe. Option 3: ask the tenant to isolate the water now, and book a contractor for tomorrow morning.",
+  "recommended_option": "Option 1",
+  "recommendation_reason": "it fixes both the leak and the fire-safety risk in one visit today",
+  "authority_limit": "three hundred pounds"
+}
