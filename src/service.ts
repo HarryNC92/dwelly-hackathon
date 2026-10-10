@@ -218,7 +218,37 @@ http.createServer(async (req, res) => {
         const start = events.find((x) => x.event === "agent.start");
         const answer = fs.existsSync(path.join(OUT, e.name, "ANSWER.md")) ? fs.readFileSync(path.join(OUT, e.name, "ANSWER.md"), "utf8") : "";
         const summary = answer.match(/## Summary\n([\s\S]*?)$/)?.[1]?.trim() ?? "";
-        return { id: e.name, status: end ? end.status : events.length ? "running" : "queued", urgency: submit?.urgency ?? route?.urgency, family: submit?.family ?? route?.families?.[0], agent: start?.agent, summary, events: events.map((x) => ({ event: x.event, tool: x.tool, problems: x.problems })) };
+        const resolution = [...events].reverse().find((x) => x.event === "tool.control" && x.tool === "submit_resolution")?.input;
+        return {
+          id: e.name,
+          status: end ? end.status : events.length ? "running" : "queued",
+          urgency: submit?.urgency ?? route?.urgency,
+          family: submit?.family ?? route?.families?.[0],
+          agent: start?.agent,
+          summary,
+          rationale: resolution?.decision,
+          summaryForHuman: resolution?.summaryForHuman,
+          nextAction: resolution?.nextAction,
+          escalation: resolution?.escalation,
+          rulesApplied: resolution?.rulesApplied,
+          notDone: resolution?.notDone,
+          conflicts: resolution?.conflicts,
+          missingInformation: resolution?.missingInformation,
+          events: events.map((x) => ({
+            ts: x.ts,
+            event: x.event,
+            name: x.name ?? x.Name ?? x.input?.name ?? x.input?.Name,
+            actionId: x.actionId,
+            tool: x.tool,
+            status: x.status,
+            phase: x.phase,
+            finish: x.finish,
+            problems: x.problems,
+            input: x.input,
+            reason: x.reason,
+            error: x.error,
+          })),
+        };
       }) : [];
       return json(res, 200, { cases });
     }
