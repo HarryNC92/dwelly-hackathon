@@ -1,0 +1,2 @@
+{ "_why": "Landlord is using his own contractor; the case header address does not match the address in every email.",
+  "cut": 17, "stage": "awaiting_results", "approval": "own_contractor", "occupancy": "tenanted", "conflicts": ["Meadow Row"], "conflictsMin": 1 }
