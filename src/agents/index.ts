@@ -16,7 +16,7 @@ export const maintenance: AgentConfig = {
   name: "maintenance",
   description: "Repairs, contractors, access, make-safe.",
   policies: ["maintenance"],
-  tools: [...ALL_READ, "create_ticket", "update_ticket", "create_work_order", "book_contractor", "request_quote", "set_hold", "close_case", "send_message", "record_landlord_decision", "propose_action", "report_blocker", "escalate"],
+  tools: [...ALL_READ, "create_ticket", "update_ticket", "create_work_order", "book_contractor", "assign_provider", "request_quote", "set_hold", "close_case", "send_message", "record_landlord_decision", "propose_action", "report_blocker", "escalate"],
   model: OPUS, effort: "medium", maxSteps: 12,
 };
 

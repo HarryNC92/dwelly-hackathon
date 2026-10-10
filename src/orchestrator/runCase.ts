@@ -18,7 +18,7 @@ import { shadowClassify } from "../classify/index.js";
 export type RunDeps = { models: ModelFactory; ctxFor: (c: Case) => ToolContext; outDir: string; folder: string; caseTimeoutMs: number };
 
 const BOOKING_TOOLS = ["book_contractor", "create_work_order", "book_inspection"];
-const SUPERSEDE = new Set(["send_message", "book_contractor", "create_work_order", "create_ticket", "book_inspection", "request_quote", "set_hold", "close_case", "escalate"]);
+const SUPERSEDE = new Set(["send_message", "book_contractor", "assign_provider", "create_work_order", "create_ticket", "book_inspection", "request_quote", "set_hold", "close_case", "escalate"]);
 const supersedeKey = (a: StagedAction) => (SUPERSEDE.has(a.tool) ? `${a.tool}|${(a.input as any).to_ref ?? (a.input as any).contractor_id ?? (a.input as any).property_id ?? ""}` : a.actionId);
 
 /**

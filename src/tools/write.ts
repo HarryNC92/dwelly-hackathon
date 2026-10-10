@@ -106,6 +106,13 @@ export const escalate: ToolDef = {
   perform: async (i, ctx) => ctx.store.upsert("escalations", rid("E", ctx), { ...i, status: "open", ...stamp(ctx) }),
 };
 
+export const assignProvider: ToolDef = {
+  name: "assign_provider", kind: "write", risk: "low",
+  description: "The agency's normal dispatch step ('Maintenance provider assigned'): assign the contractor who will attend, by panel id or by the name used in the case, once the landlord gate allows it. This is your job, not a human's; do not propose it for someone else. Follow it with the templated contractor and tenant messages.",
+  input: z.object({ provider: z.string().describe("Contractor name as used in the case, or panel id"), trade: z.string().optional(), property: z.string(), scope: z.string(), landlord_approval_ref: z.string().optional().describe("History event or decision id showing approval, or 'conditional: <wording>' or 'not required: <why>'") }),
+  perform: async (i, ctx) => ctx.store.upsert("assignments", rid("AS", ctx), { ...i, status: "assigned", ...stamp(ctx) }),
+};
+
 export const requestQuote: ToolDef = {
   name: "request_quote", kind: "write", risk: "low",
   description: "Ask a contractor or provider for an estimate for described works (no commitment to spend). Use before instructing work that needs a landlord decision.",
@@ -163,4 +170,4 @@ async function spendGuard(propertyId: string, cost: number, approvalRef: string 
   return cost > authority ? `estimated cost £${cost} exceeds landlord authority £${authority}; obtain approval (record_landlord_decision + approval_ref), use emergency=true with a justification if this is make-safe work, or escalate` : null;
 }
 
-export const WRITE_TOOLS: ToolDef[] = [createTicket, updateTicket, createWorkOrder, bookContractor, requestQuote, setHold, closeCase, sendMessage, bookInspection, recordLandlordDecision, proposeAction, reportBlocker, escalate];
+export const WRITE_TOOLS: ToolDef[] = [createTicket, updateTicket, createWorkOrder, bookContractor, assignProvider, requestQuote, setHold, closeCase, sendMessage, bookInspection, recordLandlordDecision, proposeAction, reportBlocker, escalate];

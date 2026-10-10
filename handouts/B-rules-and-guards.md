@@ -13,7 +13,7 @@ Judgement and safety (20% of the technical score) and the Best Exception Handlin
 `src/tools/write.ts` guard functions and tool descriptions (not the perform bodies), `src/runtime/checks.ts`, `src/runtime/flags.ts`, `src/runtime/rules.ts` (new: pure functions, one per rule, each returning a reason string or null, with a table of rule id, source case numbers and severity).
 
 ## Rules to implement (minimum)
-Guards (block at staging time, reason returned to the agent):
+Guards (block at staging time, reason returned to the agent). Note: `assign_provider` is the agency's dispatch step and the main target of the approval-gate guard, alongside `book_contractor` and `create_work_order`.
 - Dispatch or work order before landlord approval when `state.landlordApproval.status` is none or pending, unless conditional pre-authorisation covers it (quote the condition). Source 043, 048.
 - Second contractor while one is assigned and not released. Source 047.
 - Any message to the tenant when `occupancy` is not_tenanted. Source 006.

@@ -5,7 +5,7 @@ import type { CaseRun } from "./wrapper.js";
 import type { Trace } from "./trace.js";
 
 /** Phase 1: actions that change state (tickets, bookings, work orders). Phase 2: communications and handovers, sent only once phase 1 results are known. */
-export const STATE_TOOLS = new Set(["create_ticket", "update_ticket", "create_work_order", "book_contractor", "book_inspection", "request_quote", "set_hold", "close_case", "record_landlord_decision", "propose_action", "report_blocker"]);
+export const STATE_TOOLS = new Set(["create_ticket", "update_ticket", "create_work_order", "book_contractor", "assign_provider", "book_inspection", "request_quote", "set_hold", "close_case", "record_landlord_decision", "propose_action", "report_blocker"]);
 export const COMMS_TOOLS = new Set(["send_message", "escalate", "call_on_call_manager"]);
 
 /** Performs staged writes of one phase, in order. One execution per actionId; retries only on transient errors. */
