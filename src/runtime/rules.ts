@@ -171,6 +171,10 @@ export function resolutionRules(state: CaseState | undefined, res: Resolution, r
       hits.push({ id: "PM-DATA-002", severity: "warn", defaultAction: "request_clarification", reason: `${conf[0].slice(0, 140)}; a message to the ${role} is staged without the conflict being weighed in \`conflicts\` or the decision.` });
     }
   }
+  const addrConf = state.dataConflicts.filter((c) => /^address\b/i.test(c));
+  if (addrConf.length && outgoing.length && res.conflicts.length === 0 && !addressed("PM-DATA-001", /address[^.]{0,80}(?:conflict|differ|mismatch|wrong|verify|confirmed|header)|(?:conflict|differ|mismatch|wrong)[^.]{0,40}address/i)) {
+    hits.push({ id: "PM-DATA-001", severity: "warn", defaultAction: "escalate_human_review", reason: `${addrConf[0].slice(0, 150)}; messages are going out without the address discrepancy being weighed in \`conflicts\` or the decision.` });
+  }
   const dateAmount = state.dataConflicts.filter((c) => /^(?:"|quote from|invoice at|visit date|case header|£)/i.test(c));
   if (dateAmount.length && (has("close_case") || has("create_work_order") || res.finalState === "resolved") && !addressed("PM-DATA-003", /date|amount|vat|quote[^.]{0,40}(?:changed|differ)|invoice[^.]{0,40}(?:before|predates)/i)) {
     hits.push({ id: "PM-DATA-003", severity: "warn", defaultAction: "escalate_human_review", reason: `date or amount conflict (${dateAmount[0].slice(0, 120)}) with a closure, work order or resolved state; weigh it explicitly.` });
