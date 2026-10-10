@@ -25,7 +25,7 @@ const LL_SELF_FIX_RE = /\b(?:(?:LL|landlord) (?:completed|has dealt|has sorted|s
 const CONDITIONAL_RE = /(?:if (?:it'?s|it is|is|its) (?:something )?(?:easy|simple|cheap|low.?cost|minor|straightforward)[^.]*|only have budget[^.]*|if (?:it )?(?:turns out )?(?:needs?|requires?) (?:a )?parts?[^.]*quote[^.]*|(?:simple|low-cost) fix[^.]*)/i;
 const APPROVAL_ASK_RE = /(?:happy for|are you happy|approve|go ahead|wish to proceed|how you wish to proceed|come to a decision|let me know if you wish|shall (?:we|I)|would you like (?:us|me) to|can (?:we|I) (?:send|arrange|instruct|proceed)|do you want (?:us|me) to|please advise if you are|please let me know if they can)/i;
 const AGENCY_APPROVED_NOTE_RE = /\b(?:estimate approved|landlord has approved|LANDLORD HAS APPROVED|landlord .{0,30}?(?:approved|agreed)|LL (?:already )?(?:agreed|approved|has approved)|spoke to landlord who approved|landlord had a quote and agreed|quote .{0,40} landlord has approved)/i;
-const DONE_RE = /\b(?:(?:is|are|been|now|all) (?:now )?(?:completed?|done|fixed|repaired|replaced|installed|sorted|finished|resolved)|completed the (?:repair|work|job)|job (?:is )?(?:done|complete)|works? (?:are|is) (?:now )?complete|has been (?:completed|repaired|replaced|re-?fitted|fixed)|repair .{0,30}(?:completed|carried out)|all done|its now clear|it'?s now clear|now working|repaired under warranty|resolved)\b/i;
+const DONE_RE = /\b(?:(?:is|are|been|now|all) (?:now )?(?:completed?|done|fixed|repaired|replaced|installed|sorted|finished|resolved)|completed the (?:repair|work|job)|job (?:is )?(?:done|complete)|works? (?:are|is) (?:now )?complete|has been (?:completed|repaired|replaced|re-?fitted|fixed)|repair .{0,30}(?:completed|carried out)|all done|its now clear|it'?s now clear|now working|repaired under warranty|resolved|managed to (?:fix|sort|clear|repair)|fixed it (?:himself|herself|themselves|myself|ourselves)?)\b/i;
 const NOT_DONE_RE = /\b(?:not (?:yet )?(?:completed?|done|fixed)|when (?:completed|done)|will be (?:completed|done|finished)|once (?:completed|done)|still not|hasn'?t been|has not been|until (?:it is|its) (?:completed|done))\b/i;
 const DISPUTE_RE = /\b(?:disput|disagree|not (?:happy|acceptable)|unacceptable|complain|refus|unfair|not (?:my|our) responsib|won'?t (?:be )?pay|not paying|solicitor|ombudsman|disappoint|frustrat|chasing payment|still (?:not|hasn'?t|no)|yet again|again\b.{0,20}(?:broken|not working|same)|appalling|ridiculous|unprofessional|escalat|compensat|withhold)/i;
 const SAFETY: Array<[string, RegExp, RegExp?]> = [
@@ -368,9 +368,12 @@ export function extractCaseStateSync(events: HistoryEvent[], header: CaseHeader 
 
   // ---- occupancy
   let occupancy: CaseState["occupancy"] = "unknown";
+  const vacatedWording = /vacat|check.?out|checkout|\bempty\b|\bvoid\b|move.?in|end of tenancy|moved out|outgoing tenant/i.test(requestText + " " + (header.title ?? ""));
+  const agencyRaised = /agency|manager|staff/i.test(header.sourceRole ?? "") || (!header.sourceRole && !ev.some((e) => roleOf(e.from) === "tenant" && e.n <= 3));
   if (ev.some((e) => classified.get(e.n)?.kind === "not_tenanted")) occupancy = "not_tenanted";
+  else if (agencyRaised && vacatedWording) occupancy = "not_tenanted"; // an agency-raised job about a vacated flat stays not tenanted even if someone emailed the old tenant (006)
   else if (/tenant/i.test(header.sourceRole ?? "") || ev.some((e) => roleOf(e.to) === "tenant" || roleOf(e.from) === "tenant")) occupancy = "tenanted";
-  else if (/vacat|check.?out|empty|void|move.?in|end of tenancy|moved out|checkout/i.test(requestText + " " + (header.title ?? ""))) occupancy = "not_tenanted";
+  else if (vacatedWording) occupancy = "not_tenanted";
 
   // ---- who pays
   let whoPays: CaseState["whoPays"] = "unknown";
@@ -420,7 +423,8 @@ export function extractCaseStateSync(events: HistoryEvent[], header: CaseHeader 
   const safetySignals: string[] = [];
   const safetyHits = new Map<string, number[]>();
   const scan = (text: string, n: number | undefined) => { for (const [label, re, also] of SAFETY) if (re.test(text) && (!also || also.test(text))) { const l = safetyHits.get(label) ?? []; if (n !== undefined) l.push(n); safetyHits.set(label, l); } };
-  const noQuestions = (t: string) => t.split("\n").filter((l) => !/\?/.test(l) || /only toilet at the property\?\s*Yes/i.test(l)).join("\n");
+  // Intake Q&A puts question and answer on one line ("- Is this the only toilet? Yes"): keep only the answer part of such lines.
+  const noQuestions = (t: string) => t.split("\n").map((l) => (/\?/.test(l) && !/only toilet at the property\?\s*Yes/i.test(l) ? l.slice(l.lastIndexOf("?") + 1) : l)).join("\n");
   for (const e of ev) if (e.channel !== "Update" && e.channel !== "Hold") scan(noQuestions(e.body), e.n);
   if (attachmentsText) scan(attachmentsText, undefined);
   for (const [label, ns] of safetyHits) safetySignals.push(`${label}${ns.length ? ` (event${ns.length > 1 ? "s" : ""} ${[...new Set(ns)].slice(0, 4).join(", ")})` : " (attachment)"}`);

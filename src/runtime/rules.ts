@@ -56,7 +56,7 @@ const DEFINITE_CHARGE = /\b(?:you will be (?:charged|billed|invoiced|liable)|we 
 const INVOICE_US = /\b(?:invoice (?:us|the agency|northbridge)|send (?:the|your) invoice to (?:us|the agency)|we will (?:pay|settle) (?:the|your) invoice|the landlord will pay)\b/i;
 const NO_ISSUES = /\b(?:no (?:issues|problems|defects|concerns|damage)|all (?:fine|good|ok|in order)|nothing to report|in good (?:order|condition))\b/i;
 const DONE_CLAIM = /\b(?:has been (?:completed|repaired|fixed|replaced|resolved)|have been (?:completed|repaired|fixed|replaced)|work (?:is|was) (?:done|complete|completed)|works? (?:are|is) (?:now )?complete|job (?:is )?(?:done|complete|completed)|repair (?:is |was )?(?:complete|completed|done)|(?:is|was|been) (?:now )?fixed|issue (?:is|has been) resolved)\b/i;
-const NOT_CLAIM = /\b(?:once|when|after|if|will|until|should|not|hasn'?t|has not|yet to|awaiting|confirm(?:ed)? (?:that|whether)|reports? that|says?|said|claims?|told us|according to|states?)\b/;
+const NOT_CLAIM = /\b(?:once|when|after|if|will|until|should|not|hasn'?t|has not|yet to|awaiting|confirm(?:ed)? (?:that|whether)|reports? that|says?|said|claims?|told us|let us know|informed us|advised(?: us)?|according to|states?|(?:tenant|landlord|contractor|provider)s? (?:has |have )?(?:said|says|reported|confirmed|advised|let|told|mentioned))\b/i;
 
 function consentOnFile(state: CaseState): boolean {
   const corpus = [...state.notes, ...state.holds.map((h) => `${h.reason} ${h.comment ?? ""}`), state.landlordApproval.text ?? ""].join("\n");

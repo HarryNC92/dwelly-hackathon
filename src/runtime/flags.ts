@@ -18,8 +18,8 @@ const RULES: { name: string; re: RegExp; minUrgency?: Flag["minUrgency"]; forced
   { name: "security", re: /\b(break[- ]in|burglar|lock (is )?broken|cannot lock|can't lock|won't lock|will not lock|does ?n[o']t lock|not locking|unable to lock|lock (is )?(faulty|jammed)|locked out|(front|back|external|patio) door (won't|will not|does ?n[o']t|can't) (lock|close|shut))\b/i, minUrgency: "P1" },
   // Section 6 of docs/case-breakdown.md: judgement-call hazards seen in the public cases.
   { name: "glass_may_shatter", re: /\b(shatter|broken glass|glass (is |has )?(cracked|broken|smashed)|cracked (glass|pane|window))\b/i, minUrgency: "P1" },
-  { name: "scalding", re: /\b(scald(ing|ed)?|boiling hot|dangerously hot|too hot to (touch|use|shower))\b/i, minUrgency: "P1" },
-  { name: "escape_route", re: /\b(window[^.]{0,60}(won't|will not|cannot|can't|cant|does ?n[o']t) (be )?open|stuck (shut|closed)|fire (escape|exit)[^.]{0,40}(blocked|stuck|won't))\b/i, minUrgency: "P1" },
+  { name: "scalding", re: /\b(scald(ing|ed)?|boiling hot|dangerously hot|too hot to \w+)\b/i, minUrgency: "P1" },
+  { name: "escape_route", re: /\b(window[^.]{0,60}(won't|will not|cannot|can't|cant|does ?n[o']t|unable to) (be )?open|unable to open (the |my |our )?window|stuck (shut|closed)|fire (escape|exit)[^.]{0,40}(blocked|stuck|won't))\b/i, minUrgency: "P1" },
   { name: "rotting_door", re: /\b(rott(en|ing)|(starting|started) to rot|(door|frame)[^.]{0,30}wobbl)\b/i, minUrgency: "P2" },
   { name: "no_isolation_valves", re: /\b(no isolation valves?|without (an )?isolation valve|isolation valves? (missing|not fitted))\b/i, minUrgency: "P1" },
   { name: "leak_over_two_weeks", re: /\b(leak(ing|s)?|dripping|water (coming|pouring) (in|through))\b[^.]{0,80}\b((1[4-9]|[2-9]\d) days|(two|three|four|2|3|4|several|few) weeks|fortnight|(a|one|over a) month)\b|\b((1[4-9]|[2-9]\d) days|(two|three|four|2|3|4|several|few) weeks|fortnight|(a|one|over a) month)\b[^.]{0,80}\b(leak(ing|s)?|dripping)\b/i, minUrgency: "P1" },
