@@ -2,6 +2,9 @@
 
 Paste this at the start of any coding session on this repo. It is context only; tasks come separately.
 
+## Status as of 12:20 on the day
+Main is the fully merged system: the organiser-format adapter, the deterministic case-state extractor (`src/casefile/`, stage, parties, approvals, quotes, holds, timers, conflicts, safety, difficulty), the triage rules as guards and checks with Harry's rule ids (`src/runtime/rules.ts`), and the agency conventions policy mined from the fifty public cases (`src/policies/agency.md`). Measured on all fifty cut public cases against their hidden endings: outcome 8.2, judgement 8.0, zero critical failures, 177 seconds at concurrency 10. The 16:30 procedure is `scripts/reality-test.sh` (dry-run tested). Commands take arguments directly: `pnpm cases --cases …`, no `--` separator.
+
 ## The event
 
 Dwelly Real-World Agents Hackathon, London, Saturday 10 October 2026. Dwelly is an AI-native roll-up of UK lettings agencies (10,000+ properties). We are in the Property Management track. Building runs 10:00 to 16:30. At 10:00 we receive synthetic operational data (emails, calls, documents, CRM records, maintenance tickets, compliance cases) and possibly tools. At 16:30 code freezes and we receive unseen "Reality Test" cases, which our system must process with no human in 30 minutes. At 17:00 we submit a public Apache 2.0 repo. The organisers' rules are digested in `docs/rules-digest.md`.
