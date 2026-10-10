@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CaseStateSchema } from "./casestate.js";
 
 /** A deterministic label attached at ingest. Flags are hints, never verdicts. */
 export const FlagSchema = z.object({
@@ -27,5 +28,6 @@ export const CaseSchema = z.object({
   linkedIds: z.record(z.string(), z.string()).default({}),
   flags: z.array(FlagSchema).default([]),
   sourceFiles: z.array(z.string()).default([]),
+  state: CaseStateSchema.optional().describe("Structured state of a case file, filled by the extraction step when the case is in the organisers' format"),
 });
 export type Case = z.infer<typeof CaseSchema>;

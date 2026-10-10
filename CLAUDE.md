@@ -30,6 +30,10 @@ Compare your eval score to the previous run before claiming an improvement.
 - `src/ingest/generic.ts` any file or folder becomes a Case. `cases/sample` + `data/sample` are our synthetic training set; `evals/expected.yaml` the labels.
 - `src/service.ts` + `public/board.html` live board and the voice webhook endpoints (demo path only).
 
+## File ownership (streams, see handouts/README.md)
+- Orchestrator: `src/schemas/*`, `src/orchestrator/*`, `src/runtime/runAgent.ts`, `src/run.ts`, `src/ingest/*`, `CONTEXT.md`, `MORNING.md`, `TASKS.md`, merges.
+- A case state: `src/casefile/*`. B rules: guards in `src/tools/write.ts`, `src/runtime/checks.ts`, `src/runtime/flags.ts`, `src/runtime/rules.ts`. C policy: `src/policies/*`. D eval: `evals/*`, `src/eval.ts`, `src/judge.ts`, `src/runtime/redflags.ts`. E voice and demo: `src/service.ts`, `public/*`, `voice/*`, `demo/*`. F docs: `README.md`, `SUBMISSION.md`, `docs/*`, `scripts/*`.
+
 ## Parallel work etiquette
 - One stream per directory (see MORNING.md). Do not edit files outside your stream without saying so in your summary.
 - Use a git worktree per agent: `git worktree add ../wt-<stream> -b <stream>`. Rebase on main before merging; run the verify block after rebasing.
