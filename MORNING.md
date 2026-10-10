@@ -17,7 +17,7 @@ Where ambition still pays, for the human-judged 30 and the category awards: the 
 - The board serves live status from the trace files (`pnpm service`, http://localhost:8787).
 
 ## What changed overnight after the reviews (all committed)
-Two independent reviews ran against the real outputs and the code: a judge simulation (grading our nine real answers with the organisers' criteria) and a code review that reproduced bugs by running the modules. Thirty findings between them, almost all fixed:
+Three independent reviews ran overnight: a judge simulation grading our nine real answers with the organisers' criteria, a code review that reproduced bugs by running the modules, and a second review of the rewritten orchestrator that scripted five failure scenarios. More than forty findings between them, all but a handful of cosmetic ones fixed:
 - Writes execute in two phases: state changes first (tickets, bookings, work orders), then messages and handovers. If a booking fails, the agent gets one reconciliation turn with the real results, its pending messages are withdrawn, it books the next panel contractor or escalates with "NO CONTRACTOR CONFIRMED", and restages messages that match reality. A deterministic claim check then refuses any text that still describes a failed action as done.
 - Every ANSWER.md now opens with an execution status block generated from results, not from the agent's prose, and ends with the full text of every message actually sent.
 - Cases are grouped by building through the record store, run in time order inside a group, and the prefetch pulls sibling flats and their tickets, so the flat 3 ceiling leak sees the flat 5 waste pipe.
@@ -36,7 +36,7 @@ Measured: 45 to 65 seconds per case, dominated by the agent's 6 to 10 steps on O
 
 ## How you test it today
 ```bash
-pnpm smoke                                                   # offline sanity, run after every merge
+pnpm smoke && pnpm scenarios                                 # offline sanity, run after every merge
 pnpm cases -- --cases ./cases/sample --data ./data/sample --out ./out/<name> --concurrency 8 --inject "book_contractor:fail:1"
 pnpm eval  -- --out ./out/<name>                             # scoreboard
 pnpm judge -- --out ./out/<name> --cases ./cases/sample --report ./out/<name>-judge.md   # Opus grades like the organisers
