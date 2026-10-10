@@ -30,10 +30,12 @@ export async function buildCasePack(c: Case, route: Route, ctx: ToolContext, tra
   const flags = c.flags.map((f) => `- ${f.name} (evidence: "${f.evidence}")${f.forcedAction ? ` FORCED: ${f.forcedAction}` : ""}`).join("\n") || "- none";
   let prefetch = "Prefetch skipped.";
   let policyDocs = "";
+  const caseFile = (c.structured as any)?.format === "case-file";
   try {
     const p = await prefetchContext(c, ctx.store);
     trace.log("prefetch", { found: p.records.map((r) => `${r.type}/${r.id}`), queries: p.queries, misses: p.misses });
     prefetch = renderPrefetch(p);
+    if (caseFile && p.records.length === 0) prefetch = "This case arrives as a complete case file: the history and attachments above are the whole system of record. There is no separate property, tenancy, landlord or contractor database for it, and record lookups will return nothing, so do not spend steps searching or report the absence of records as a blocker. Work from the history, the attachments and the agency conventions. Use the people, names, job id, addresses and figures exactly as they appear in the case.";
   } catch (e) { trace.log("prefetch.error", { error: String(e) }); }
   try {
     const docs = await ctx.store.list("document", 5);

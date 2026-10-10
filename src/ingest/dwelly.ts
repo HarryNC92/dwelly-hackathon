@@ -99,7 +99,7 @@ export async function buildDwellyCase(id: string, dir: string, opts: DwellyOptio
   if (property) linkedIds.property_address = property;
   const c = CaseSchema.parse({
     id, channel: sourceRole ? `${sourceRole.toLowerCase()} request` : "case-file", kind: question ? "question" : "event", receivedAt: lastTs,
-    rawText: rawText + extra, structured: { title, source_role: sourceRole, status: detail("Status"), created, property, job_id: jobId ?? null, events: events.length, cut: cut ?? null },
+    rawText: rawText + extra, structured: { format: "case-file", title, source_role: sourceRole, status: detail("Status"), created, property, job_id: jobId ?? null, events: events.length, cut: cut ?? null },
     attachments, linkedIds, sourceFiles: ["index.md", "history.md", ...attachments.map((a) => `attachments/${a.name}`)], flags: [],
   });
   c.flags = computeFlags(c.rawText);

@@ -6,6 +6,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 import { parse as parseYaml } from "yaml";
 import { realModels } from "./runtime/models.js";
+import { loadCases } from "./ingest/generic.js";
 
 /**
  * Judge simulator. Grades each case the way the organisers' Claude-based judge is described in the rules:
@@ -13,7 +14,7 @@ import { realModels } from "./runtime/models.js";
  * It reads only what the real judge will read: the case input, ANSWER.md, REASONING.md and a trace digest.
  * Our hand-written notes in evals/expected.yaml stand in for the organisers' hidden rubric.
  */
-const o = new Command().requiredOption("--out <dir>").requiredOption("--cases <dir>").option("--expected <file>", "", "./evals/expected.yaml").option("--only <ids>").option("--report <file>").option("--after-dir <dir>", "directory of <id>.md files with the hidden ending of each cut case (from pnpm cut); used as the rubric when no notes exist").parse().opts();
+const o = new Command().requiredOption("--out <dir>").requiredOption("--cases <dir>").option("--expected <file>", "", "./evals/expected.yaml").option("--only <ids>").option("--report <file>").option("--after-dir <dir>", "directory of <id>.md files with the hidden ending of each cut case (from pnpm cut); used as the rubric when no notes exist").option("--cuts <file>", "the same cuts file the run used, so the judge sees exactly what the system saw").option("--show-outcome", "", false).parse().opts();
 
 const Grade = z.object({
   outcome_score: z.number().describe("0-10: did the system reach the right resolution and take appropriate actions?"),
@@ -33,14 +34,16 @@ async function main() {
   const expected = (fs.existsSync(o.expected) ? parseYaml(fs.readFileSync(o.expected, "utf8")) : {}) as Record<string, { notes?: string }>;
   const outDir = path.resolve(o.out); const casesDir = path.resolve(o.cases);
   const index: { folder: string; case_id: string }[] = JSON.parse(fs.readFileSync(path.join(outDir, "index.json"), "utf8"));
+  const cuts = o.cuts ? JSON.parse(fs.readFileSync(path.resolve(o.cuts), "utf8")) : undefined;
+  const loaded = new Map((await loadCases(casesDir, { cuts, showOutcome: Boolean(o.showOutcome) })).map((c) => [c.id, c]));
   const only = o.only ? new Set(String(o.only).split(",")) : null;
   const rows: string[] = []; let sumO = 0, sumJ = 0, n = 0, crit = 0;
   for (const { folder, case_id } of index) {
     if (only && !only.has(case_id)) continue;
     const dir = path.join(outDir, folder);
     const read = (f: string) => (fs.existsSync(path.join(dir, f)) ? fs.readFileSync(path.join(dir, f), "utf8") : "(missing)");
-    const caseDir = path.join(casesDir, case_id);
-    const input = fs.existsSync(caseDir) && fs.statSync(caseDir).isDirectory() ? fs.readdirSync(caseDir).map((f) => `--- ${f} ---\n${fs.readFileSync(path.join(caseDir, f), "utf8")}`).join("\n") : "(see folder)";
+    const loadedCase = loaded.get(case_id);
+    const input = loadedCase ? `${loadedCase.rawText}${loadedCase.attachments.length ? `\n\n[attachments passed to the system: ${loadedCase.attachments.map((a) => a.name).join(", ")}]` : ""}` : "(case not found)";
     const trace = read("trace.jsonl").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)
       .filter((e: any) => /^(tool\.|execute\.|checks|agent\.(submit|reroute|error|fallback)|escalate)/.test(e.event)).map((e: any) => JSON.stringify({ ...e, ts: undefined, case: undefined })).join("\n").slice(0, 12000);
     const afterFile = o.afterDir ? path.join(path.resolve(o.afterDir), `${case_id}.md`) : null;
