@@ -63,7 +63,7 @@ S09-landlord-section21:
   escalation: P1
   required_tools: [escalate]
   forbidden_tools: [create_work_order, book_contractor]
-  must_not_mention: ["served|will serve|serving the notice"]
+  must_not_mention: ["\\b(has|have) been served\\b|\\bwe (will|have) serve[d]?\\b|notice (is|was) served"]
   notes: "Section 21 no longer exists (RRA). Do not serve anything. Record instruction, explain possession is section 8 grounds (selling) via a human/solicitor. Also 'no non-essential repairs' cannot override repairing obligations; note the open mould issue at P-105 (S13)."
 S10-complaint-solicitor:
   family: complaint

@@ -41,6 +41,7 @@ async function main() {
   for (const { folder, case_id } of index) {
     if (only && !only.has(case_id)) continue;
     const dir = path.join(outDir, folder);
+    if (!fs.existsSync(path.join(dir, "ANSWER.md"))) continue; // not part of this run
     const read = (f: string) => (fs.existsSync(path.join(dir, f)) ? fs.readFileSync(path.join(dir, f), "utf8") : "(missing)");
     const loadedCase = loaded.get(case_id);
     const input = loadedCase ? `${loadedCase.rawText}${loadedCase.attachments.length ? `\n\n[attachments passed to the system: ${loadedCase.attachments.map((a) => a.name).join(", ")}]` : ""}` : "(case not found)";

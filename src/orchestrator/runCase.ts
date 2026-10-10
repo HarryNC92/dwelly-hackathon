@@ -119,12 +119,15 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseOutput> {
         const unrecovered = troubled().some((a) => BOOKING_TOOLS.includes(a.tool)) && !run.staged.some((a) => a.status === "success" && BOOKING_TOOLS.includes(a.tool));
         if (claims.length || unrecovered || !accepted) {
           const fact = `Execution check: ${[...claims, ...troubled().map((a) => `${a.actionId} ${a.status}${a.error ? ` (${a.error})` : ""}`)].join("; ") || "reconciliation not accepted"}.`;
-          if (claims.length || unrecovered) withdrawPendingComms(run, trace); // anything restaged that still makes a false claim does not go out
+          if (claims.length) withdrawPendingComms(run, trace); // only messages that still make a false claim are held back; honest restaged messages go out
           const tier: "P0" | "P1" = res.escalation.tier !== "none" ? res.escalation.tier : res.urgency === "P0" ? "P0" : "P1";
-          const decisionRequired = (unrecovered ? "NO CONTRACTOR CONFIRMED. " : "") + (res.escalation.decisionRequired ?? "Correct what the tenant and landlord were told and confirm the arrangements.");
+          const existing = res.escalation.decisionRequired ?? "Correct what the tenant and landlord were told and confirm the arrangements.";
+          const decisionRequired = unrecovered && !/NO CONTRACTOR CONFIRMED/i.test(existing) ? `NO CONTRACTOR CONFIRMED. ${existing}` : existing;
           trace.log("claims.unresolved", { claims, unrecovered, accepted });
-          res = { ...res, decision: `${fact} ${res.decision}`, finalState: res.finalState === "scheduled" || res.finalState === "resolved" ? "escalated" : res.finalState, escalation: { tier, reason: fact, decisionRequired, deadline: res.escalation.deadline, handover: fact } };
-          pushEscalate("escalate#claims", tier, decisionRequired, fact);
+          res = { ...res, decision: /^Execution check:/.test(res.decision) ? res.decision : `${fact} ${res.decision}`, finalState: res.finalState === "scheduled" || res.finalState === "resolved" ? "escalated" : res.finalState, escalation: { tier, reason: fact, decisionRequired, deadline: res.escalation.deadline, handover: res.escalation.handover ?? res.summaryForHuman } };
+          const agentEscalation = run.staged.find((a) => a.tool === "escalate" && (a.status === "staged" || a.status === "success"));
+          if (!agentEscalation) pushEscalate("escalate#claims", tier, decisionRequired, fact);
+          else if (agentEscalation.status === "staged") (agentEscalation.input as any).what_was_tried = `${(agentEscalation.input as any).what_was_tried ?? ""} ${fact}`.trim();
         }
       }
 
