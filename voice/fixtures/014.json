@@ -1,0 +1,15 @@
+{
+  "case_id": "PM-014",
+  "recipient_role": "landlord",
+  "recipient_name": "there",
+  "property": "Flat 12, 52 Meadow Row, Kingshaven",
+  "tenant_name": "the tenant",
+  "issue": "The tenant's front door only shuts if it is slammed. An engineer visiting for another job warned the tenant that the door glass will shatter if this continues.",
+  "why_urgent": "This is the main exit. Slamming risks the glass shattering and injuring someone, and the door may not secure the property.",
+  "risk_if_delayed": "Injury from broken glass, and an insecure property overnight.",
+  "facts_uncertain": "No contractor has inspected the door yet, and we have not confirmed whether the glass is already cracked.",
+  "options": "Option 1: we send an emergency door and glazing contractor today to make it safe, estimated one hundred and fifty to three hundred pounds. Option 2: you use your own contractor, who must attend within 24 hours. Option 3: we apply temporary safety film or boarding today and book the full repair for later.",
+  "recommended_option": "Option 1",
+  "recommendation_reason": "it removes the injury risk today and the cost is in line with a normal emergency call-out",
+  "authority_limit": "three hundred pounds"
+}
