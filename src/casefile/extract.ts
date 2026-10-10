@@ -24,6 +24,11 @@ const TENANT_FIX_RE = /\b(?:tenant(?:s)? (?:to|can|may|could) fix|approves the t
 const LL_SELF_FIX_RE = /\b(?:(?:LL|landlord) (?:completed|has dealt|has sorted|sorted|confirmed he has sorted|did it|fixed|dealt with) |LL completed by himself|landlord has dealt with|ll (?:rang and )?confirmed (?:this is all done|he has sorted)|knack of how to close|LL INFORMED US)/i;
 const CONDITIONAL_RE = /(?:if (?:it'?s|it is|is|its) (?:something )?(?:easy|simple|cheap|low.?cost|minor|straightforward)[^.]*|only have budget[^.]*|if (?:it )?(?:turns out )?(?:needs?|requires?) (?:a )?parts?[^.]*quote[^.]*|(?:simple|low-cost) fix[^.]*)/i;
 const APPROVAL_ASK_RE = /(?:happy for|are you happy|approve|go ahead|wish to proceed|how you wish to proceed|come to a decision|let me know if you wish|shall (?:we|I)|would you like (?:us|me) to|can (?:we|I) (?:send|arrange|instruct|proceed)|do you want (?:us|me) to|please advise if you are|please let me know if they can)/i;
+// Informal assent after an approval request ("Yes that sounds like it needs sorting fairly soon", "ok", "sounds good") and
+// instructions on how to proceed ("contact the contractor Keystone Works used last year", "use X") both count as approval.
+const ASSENT_RE = /^(?:yes|yep|yeah|yup|ok|okay|sure|fine|agreed|absolutely|of course|great|perfect|please do|go ahead|go for it)\b|\b(?:sounds (?:good|fine|great|right|sensible|like it needs)|needs? (?:sorting|doing|fixing|looking at|to be (?:sorted|fixed|done))|get (?:it|that|this|someone|somebody|a contractor|an engineer|him|her|them) (?:out|sorted|done|fixed|round|to (?:look|attend))|please (?:sort|fix|arrange|organise|organize|book|send|instruct)|happy (?:for|to|with)|carry on|crack on|that(?:'s| is| would be) (?:fine|great|ok|okay|good)|no problem|by all means|fairly soon|as soon as)\b/i;
+const INSTRUCT_RE = /\b(?:requests?|asks?|would like|wants?|instructs?|suggests?|advises?) (?:that |us to |you to |the agency to )?(?:the |a |an )?(?:contractor|engineer|plumber|electrician|company|handyman|supplier|manufacturer|[A-Z][a-z]+(?: [A-Z][a-z]+)?)\b[^.]{0,90}?\b(?:be contacted|be used|be instructed|be asked|be called|attend|contacted|instructed|look at|to (?:attend|quote|look|come))|\b(?:use|contact|call|try|ring|book|get) (?:the )?(?:same )?(?:contractor|company|engineer|plumber|electrician|[A-Z][a-z]+(?: [A-Z][a-z]+)?) (?:who|that|used|from|we used|you used|again|out)|\bunder (?:the )?(?:warranty|guarantee)\b[^.]{0,60}\b(?:contact|call|repair|service)/i;
+const QUESTION_RE = /\b(?:inquir|asks? (?:about|if|whether|for an update)|is seeking|requests? (?:an )?update|any update|wondering|has (?:it|this) been|was (?:it|this) (?:resolved|fixed|done))\b|\?\s*$/i;
 const AGENCY_APPROVED_NOTE_RE = /\b(?:estimate approved|landlord has approved|LANDLORD HAS APPROVED|landlord .{0,30}?(?:approved|agreed)|LL (?:already )?(?:agreed|approved|has approved)|spoke to landlord who approved|landlord had a quote and agreed|quote .{0,40} landlord has approved)/i;
 const DONE_RE = /\b(?:(?:is|are|been|now|all) (?:now )?(?:completed?|done|fixed|repaired|replaced|installed|sorted|finished|resolved)|completed the (?:repair|work|job)|job (?:is )?(?:done|complete)|works? (?:are|is) (?:now )?complete|has been (?:completed|repaired|replaced|re-?fitted|fixed)|repair .{0,30}(?:completed|carried out)|all done|its now clear|it'?s now clear|now working|repaired under warranty|resolved|managed to (?:fix|sort|clear|repair)|fixed it (?:himself|herself|themselves|myself|ourselves)?)\b/i;
 const NOT_DONE_RE = /\b(?:not (?:yet )?(?:completed?|done|fixed)|when (?:completed|done)|will be (?:completed|done|finished)|once (?:completed|done)|still not|hasn'?t been|has not been|until (?:it is|its) (?:completed|done))\b/i;
@@ -324,11 +329,16 @@ export function extractCaseStateSync(events: HistoryEvent[], header: CaseHeader 
     }
     if (fr === "landlord" && ["Email", "SMS", "Call"].includes(e.channel)) {
       const cm = text.match(CONDITIONAL_RE); if (cm) conditions = cm[0].trim();
+      // The reply proper: greeting line, sign-off and signature removed, so "Hi Oliver\n\nYes that sounds..." starts at "Yes".
+      const reply = bodyLines(e.body).filter((l) => !/^(?:hi|hello|hey|dear|hiya|morning|good (?:morning|afternoon|evening))\b[^\n]{0,40}$/i.test(l) && !/^(?:thanks|thank you|many thanks|regards|kind regards|best|cheers|sent from)\b/i.test(l) && !/^[A-Z][a-z]+(?: [A-Z][a-z]+)?$/.test(l)).join(" ").replace(/\s+/g, " ").trim();
+      const asked = signals.some((s) => s.status === "pending" && s.n < e.n);
+      const im = !QUESTION_RE.test(reply) ? reply.match(INSTRUCT_RE) : null;
       if (OWN_CONTRACTOR_RE.test(text)) signals.push({ n: e.n, status: "own_contractor", text });
       else if (TENANT_FIX_RE.test(text)) signals.push({ n: e.n, status: "tenant_to_fix", text });
       else if (DECLINE_RE.test(text)) signals.push({ n: e.n, status: "declined", text });
       else if (cm) signals.push({ n: e.n, status: "conditional", text, conditions: cm[0].trim() });
-      else if (APPROVE_RE.test(text) || /👍/.test(e.body) && e.body.trim().length < 60 || /^(?:ok|okay|yes|fine|agreed|sure)[.!]?$/i.test(e.body.trim())) signals.push({ n: e.n, status: "approved", text });
+      else if (im) { const sentence = reply.split(/(?<=[.!])\s+/).find((s) => INSTRUCT_RE.test(s)) ?? im[0]; signals.push({ n: e.n, status: "conditional", text, conditions: `landlord's route: ${sentence.trim().slice(0, 160)}` }); }
+      else if (APPROVE_RE.test(text) || /👍/.test(e.body) && e.body.trim().length < 60 || /^(?:ok|okay|yes|fine|agreed|sure)[.!]?$/i.test(e.body.trim()) || (asked && ASSENT_RE.test(reply) && !QUESTION_RE.test(reply))) signals.push({ n: e.n, status: "approved", text });
     } else if (isOutbound(e) && to === "landlord" && APPROVAL_ASK_RE.test(text) && (/\?/.test(text) || /let me know/i.test(text))) {
       signals.push({ n: e.n, status: "pending", text, ask: true });
     }
@@ -361,7 +371,7 @@ export function extractCaseStateSync(events: HistoryEvent[], header: CaseHeader 
   const decidedAfterQuote = (approval.eventN ?? 0) > lastQuoteSentN && !["pending", "none"].includes(approval.status);
   if (lastQuoteToLL && !closed.has(stage) && (stageEvidenceEventN ?? 0) < lastQuoteSentN && !decidedAfterQuote) { stage = "quote_loop"; stageEvidenceEventN = lastQuoteSentN; }
   else if (lastQuoteToLL && !closed.has(stage) && decidedAfterQuote && approval.status === "approved" && (stageEvidenceEventN ?? 0) < lastQuoteSentN) { stage = providerAssigned ? "awaiting_visit_date" : "dispatch"; stageEvidenceEventN = approval.eventN; }
-  if (stage === "landlord_gate" && approval.status === "approved" && (approval.eventN ?? 0) > (stageEvidenceEventN ?? 0)) { stage = "dispatch"; stageEvidenceEventN = approval.eventN; }
+  if (stage === "landlord_gate" && (approval.status === "approved" || approval.status === "conditional") && (approval.eventN ?? 0) > (stageEvidenceEventN ?? 0)) { stage = "dispatch"; stageEvidenceEventN = approval.eventN; }
   if (stage === "landlord_gate" && (approval.status === "own_contractor" || approval.status === "tenant_to_fix" || approval.status === "landlord_self_fix") && (approval.eventN ?? 0) > (stageEvidenceEventN ?? 0)) { stage = "awaiting_results"; stageEvidenceEventN = approval.eventN; }
   if (["intake", "landlord_gate", "dispatch", "awaiting_visit_date", "visit_scheduled", "awaiting_results", "quote_loop"].includes(stage) && workResults.present && (workResults.eventN ?? 0) > (stageEvidenceEventN ?? 0)) { stage = "close_out"; stageEvidenceEventN = workResults.eventN; }
   if (stage === "visit_scheduled" && visit.date && new Date(visit.date + "Z").getTime() + DAY < nowMs && !workResults.present) { stage = "awaiting_results"; }

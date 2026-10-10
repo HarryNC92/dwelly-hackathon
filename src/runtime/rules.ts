@@ -15,7 +15,12 @@ import type { Resolution, StagedAction } from "../schemas/resolution.js";
 
 export type Severity = "block" | "warn";
 export type RuleHit = { id: string; severity: Severity; defaultAction: string; reason: string };
-export type CaseInfo = { channel?: string; now?: string };
+export type CaseInfo = { channel?: string; now?: string; rawText?: string };
+
+/** The case pack renders every event as "### event NNN — ts — channel — from X to Y"; this says whether event n was written by the landlord. */
+export function landlordAuthoredEvent(rawText: string | undefined, n: number): boolean {
+  return !!rawText && new RegExp(`^### event 0*${n} — [^\\n]*— from Landlord\\b`, "im").test(rawText);
+}
 type Run = { staged: StagedAction[] };
 
 export const RULE_TABLE: { id: string; precedence: number; title: string; severity: Severity; sources: string }[] = [
@@ -113,7 +118,14 @@ export function guardRules(tool: string, input: any, state: CaseState | undefine
       const q = state.quotes.filter((x) => x.sentToLandlordEventN !== undefined).pop();
       return { id: "PM-AUTH-002", severity: "block", defaultAction: "hold_waiting_for_landlord", reason: `a quote${q ? ` (${q.provider} £${q.amountGbp}${q.vat === "plus" ? " +VAT" : ""}, sent at event ${q.sentToLandlordEventN})` : ""} is with the landlord and not yet approved; works cannot be instructed. Attendance to triage is not approval for the works.` };
     }
-    if (["none", "pending", "declined"].includes(a.status) && !emergency && !agencyInitiated(info) && !continuing) {
+    // The agent may cite a landlord message the extractor did not read as approval: a landlord-authored event after the ask is accepted as evidence.
+    const cited = refText.match(/event\s*0*(\d+)/i);
+    const citedN = cited ? Number(cited[1]) : 0;
+    if (["none", "pending"].includes(a.status) && citedN > (a.eventN ?? 0) && landlordAuthoredEvent(info.rawText, citedN)) {
+      const note = `[PM-AUTH-001] approval taken from event ${citedN} on the agent's citation (landlord-authored, after the approval request at event ${a.eventN ?? "?"})`;
+      state.landlordApproval = { ...a, status: "approved", eventN: citedN, text: `approval taken from event ${citedN} on the agent's citation` };
+      if (!state.notes.includes(note)) state.notes.push(note);
+    } else if (["none", "pending", "declined"].includes(a.status) && !emergency && !agencyInitiated(info) && !continuing) {
       const detail = a.status === "declined" ? `the landlord declined (event ${a.eventN})` : a.status === "pending" ? `landlord approval is pending${a.eventN ? ` since event ${a.eventN}` : ""}${state.timers.landlordReplyDue ? `, reply due ${state.timers.landlordReplyDue.slice(0, 16)}` : ""}` : "no landlord approval is recorded in the case";
       return { id: "PM-AUTH-001", severity: "block", defaultAction: a.status === "pending" && !expired(state.timers.landlordReplyDue, info.now) ? "no_action_timer_not_expired" : "request_landlord_approval", reason: `${detail}; ${tool} is dispatch and needs it first. Approval may be a landlord message or the system line "Landlord approval confirmed".` };
     }

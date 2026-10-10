@@ -3,7 +3,7 @@ import type { ToolDef, ToolContext } from "./types.js";
 import { guardRules, formatHit } from "../runtime/rules.js";
 
 /** Triage rules (docs/triage-rules.md) read the extracted case state; no state means no rule applies. */
-const ruleGuard = (tool: string, input: unknown, ctx: ToolContext): string | null => { const h = guardRules(tool, input, ctx.case?.state, { channel: ctx.case?.channel, now: ctx.now }); return h ? formatHit(h) : null; };
+const ruleGuard = (tool: string, input: unknown, ctx: ToolContext): string | null => { const h = guardRules(tool, input, ctx.case?.state, { channel: ctx.case?.channel, now: ctx.now, rawText: ctx.case?.rawText }); return h ? formatHit(h) : null; };
 
 /**
  * Every write is staged at request time and performed only after checks pass.
