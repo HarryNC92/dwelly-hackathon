@@ -1,6 +1,7 @@
 # Morning brief (written overnight, 10 Oct 2026, read this on the tube)
 
 ## Do these before anything else
+0. **Timing correction from the Hacker Guide (read on site):** code AND the 60-second video freeze at 16:30, not 17:00. Only the Reality Test results go in by 17:00. The video must be recorded before 16:30, so Stream D's recording happens during the 15:45 rehearsal, not after. Anthropic API credits were emailed to the registration address; check that inbox.
 1. **Anthropic credit.** Your org ran out of API credit at 00:33 last night, mid-run (same failure as the Vabel sandbox). Nine of sixteen sample cases completed, seven died with "credit balance too low". Top up now, or get the hackathon key at onboarding and put it in `.env`. Nothing runs without this.
 2. **Twilio upgrade** for Vedaant's outbound call (trial accounts only dial verified numbers). The ElevenLabs steps are in VOICE-BRIEF.md; the backend endpoints exist and are tested.
 3. **Create the public GitHub repo** and push `dwelly-hackathon` as the initial commit. There is nothing from the Fabriq engine in it, the LICENSE is Apache 2.0 and no secrets are committed. A fresh repo tomorrow would throw away a tested pipeline for no gain.
@@ -44,7 +45,7 @@ pnpm judge -- --out ./out/<name> --cases ./cases/sample --report ./out/<name>-ju
 The first real run today should be the full sixteen with the injection, then read the judge report, then open their data.
 
 ## The day, in one paragraph
-10:00 read the briefing and the data layout; Stream A adapts seed and ingest to their files and gets a first full run; Streams B, C, D, E, F run in parallel per TASKS.md. 11:00 check flag and routing precision; if routing is poor, send everything to the generalist. 13:00 eval and judge on their training cases, fix the worst ten through policies, flags and checks. 15:45 dress rehearsal on a held-out subset with failure injection and a malformed file, including the commit. 16:15 freeze. 16:30 run the Reality Test with `--numbered --deadline 22`, commit ANSWERS, 17:00 push. Nobody edits ANSWERS by hand.
+10:00 read the briefing and the data layout; Stream A adapts seed and ingest to their files and gets a first full run; Streams B, C, D, E, F run in parallel per TASKS.md. 11:00 check flag and routing precision; if routing is poor, send everything to the generalist. 13:00 eval and judge on their training cases, fix the worst ten through policies, flags and checks. 15:30 dress rehearsal on a held-out subset with failure injection and a malformed file, including the commit; record the demo video during it. 16:15 final commit, 16:30 submit the form with the commit hash and the video path (code and video freeze). 16:30 run the Reality Test with `--numbered --deadline 22`, commit ANSWERS only, 17:00 push. Nobody edits ANSWERS by hand.
 
 ## Risks I could not retire overnight
 - Their data shape. Everything is generic, but id detection, date fields and the property or building link need ten minutes of adapter work at 10:00 (Stream A).

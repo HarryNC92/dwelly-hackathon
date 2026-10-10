@@ -14,7 +14,7 @@ Brief: "Read the organisers' briefing notes in `./docs/briefing.md` (I will past
 Brief: "Write `evals/expected-dwelly.yaml` for the organisers' training cases in `./cases/dwelly`, in the same format as `evals/expected.yaml` (family, urgency, escalation, required/forbidden tools, must/must-not mention, and a `notes` line that states what a competent UK lettings operations manager would expect). Be specific about safety cases, conflicting information and anything that must not be actioned. Then run `pnpm eval -- --out ./out/dwelly-1 --expected ./evals/expected-dwelly.yaml` and `pnpm judge -- --out ./out/dwelly-1 --cases ./cases/dwelly --expected ./evals/expected-dwelly.yaml --report ./out/dwelly-1-judge.md`. Report the ten worst cases with the reason each lost points. Do not change code."
 
 ### Stream D — Demo and board
-Brief: "The live board is `public/board.html` served by `src/service.ts` (`pnpm service`, then open http://localhost:8787 with `OUT_DIR` pointing at a run). Make it demo-ready: a map panel (Leaflet from a CDN) with one pin per property when the data has postcodes (geocode once via postcodes.io at seed time and store lat/lng on the property record; add `--geocode` to `src/run.ts`), pins coloured by the worst open case urgency, cards that animate state changes, and a header counter. Keep it one HTML file plus one endpoint. Then record a 25-second screen capture of a full run on `./cases/sample` for the demo video and put it in `demo/`."
+Brief: "The live board is `public/board.html` served by `src/service.ts` (`pnpm service`, then open http://localhost:8787 with `OUT_DIR` pointing at a run). Make it demo-ready: a map panel (Leaflet from a CDN) with one pin per property when the data has postcodes (geocode once via postcodes.io at seed time and store lat/lng on the property record; add `--geocode` to `src/run.ts`), pins coloured by the worst open case urgency, cards that animate state changes, and a header counter. Keep it one HTML file plus one endpoint. Then record the demo video during the 15:30 rehearsal and put it in `demo/`; it must be in the repo at the 16:30 freeze."
 
 ### Stream E — Voice and inbound (Vedaant)
 Brief: see `VOICE-BRIEF.md`. Backend side: `src/service.ts` already has `/api/escalations` and `/api/webhooks/elevenlabs`. Add `/api/inbound` for Twilio WhatsApp/SMS webhooks that writes a new case folder into `./cases/live/<id>` and triggers `runCase` for it, and replies on the same channel from the resolution's tenant communication. Verify the signature on the ElevenLabs webhook before the demo.
@@ -28,10 +28,10 @@ Stream A has the first full run on their data. Measure: how many cases error, fl
 ## 13:00 checkpoint
 Eval and judge scores on their training cases. Fix the worst ten by changing policies, flags or checks, in that order. Do not add a model verifier unless the judge report shows a class of error the checks miss.
 
-## 15:30 freeze features. 15:45 dress rehearsal
+## 15:00 freeze features. 15:30 dress rehearsal and demo recording (code and video freeze at 16:30, per the Hacker Guide)
 On a held-out subset with `--inject "book_contractor:fail:1,send_message:unknown:1"` and one malformed file dropped into the cases directory. Time the whole thing including `git add ANSWERS && git commit`. Fix anything that breaks the rehearsal; nothing else.
 
-## 16:15 code freeze. 16:30 Reality Test
+## 16:15 final commit; 16:30 submit code hash and video; 16:30 Reality Test
 ```bash
 pnpm cases -- --cases ./cases/reality --data ./data/dwelly --out ./ANSWERS --concurrency 10 --numbered --deadline 22
 git add ANSWERS && git commit -m "Reality Test results" && git push

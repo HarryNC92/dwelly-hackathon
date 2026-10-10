@@ -17,11 +17,11 @@ export const createTicket: ToolDef = {
 
 export const updateTicket: ToolDef = {
   name: "update_ticket", kind: "write", risk: "low",
-  description: "Update status or add a note to an existing ticket.",
-  input: z.object({ ticket_id: z.string(), status: z.string().optional(), note: z.string().optional() }),
+  description: "Update the status of, or add a note to, a ticket or job (use the case's Job Id for the case itself).",
+  input: z.object({ ticket_id: z.string().describe("Ticket or job id, e.g. the case's Job Id"), status: z.string().optional(), note: z.string().optional() }),
   perform: async (i, ctx) => {
     const existing = await ctx.store.get("tickets", i.ticket_id);
-    if (!existing) throw new Error(`ticket ${i.ticket_id} not found`);
+    if (!existing) return ctx.store.upsert("tickets", i.ticket_id, { status: i.status ?? "open", notes: [{ note: i.note, ...stamp(ctx) }], ...stamp(ctx) }); // the case's own job id, not yet in our store
     const notes = Array.isArray(existing.data.notes) ? existing.data.notes : [];
     return ctx.store.patch("tickets", i.ticket_id, { ...(i.status ? { status: i.status } : {}), notes: [...notes, { note: i.note, ...stamp(ctx) }] });
   },
@@ -41,11 +41,12 @@ export const bookContractor: ToolDef = {
   input: z.object({ contractor_id: z.string(), property_id: z.string(), slot: z.string().describe("ISO datetime or window"), scope: z.string(), estimated_cost_gbp: z.number().optional(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record that approves this spend"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
   guard: async (i, ctx) => {
     const c = await ctx.store.get("contractors", i.contractor_id);
-    if (!c) return `contractor ${i.contractor_id} is not on the approved panel`;
-    if (c.data && (c.data as any).on_panel === false) return `contractor ${i.contractor_id} is marked off-panel`;
-    const dnu = await doNotUse(i.property_id, c.data as any, ctx);
+    const panelKnown = (await ctx.store.list("contractors", 1)).length > 0;
+    if (!c && panelKnown) return `contractor ${i.contractor_id} is not on the approved panel`;
+    if (c?.data && (c.data as any).on_panel === false) return `contractor ${i.contractor_id} is marked off-panel`;
+    const dnu = c ? await doNotUse(i.property_id, c.data as any, ctx) : null;
     if (dnu) return dnu;
-    const cost = i.estimated_cost_gbp ?? Number((c.data as any).callout_gbp ?? (c.data as any).callout ?? NaN);
+    const cost = i.estimated_cost_gbp ?? Number((c?.data as any)?.callout_gbp ?? (c?.data as any)?.callout ?? NaN);
     return Number.isNaN(cost) ? null : spendGuard(i.property_id, cost, i.approval_ref, ctx, i.emergency, i.emergency_justification);
   },
   perform: async (i, ctx) => {
@@ -105,6 +106,28 @@ export const escalate: ToolDef = {
   perform: async (i, ctx) => ctx.store.upsert("escalations", rid("E", ctx), { ...i, status: "open", ...stamp(ctx) }),
 };
 
+export const requestQuote: ToolDef = {
+  name: "request_quote", kind: "write", risk: "low",
+  description: "Ask a contractor or provider for an estimate for described works (no commitment to spend). Use before instructing work that needs a landlord decision.",
+  input: z.object({ contractor_ref: z.string().describe("Contractor id, or name as it appears in the case"), property: z.string(), scope: z.string(), by_date: z.string().optional() }),
+  perform: async (i, ctx) => ctx.store.upsert("quotes", rid("Q", ctx), { ...i, status: "requested", ...stamp(ctx) }),
+};
+
+export const setHold: ToolDef = {
+  name: "set_hold", kind: "write", risk: "none",
+  description: "Put the case on hold while waiting for a named party or event (e.g. waiting for landlord approval, waiting for provider quote). Say who you are waiting for and until when.",
+  input: z.object({ reason: z.string(), waiting_for: z.enum(["tenant", "landlord", "contractor", "agency", "other"]), until: z.string().optional() }),
+  perform: async (i, ctx) => ctx.store.upsert("holds", rid("H", ctx), { ...i, status: "on_hold", ...stamp(ctx) }),
+};
+
+export const closeCase: ToolDef = {
+  name: "close_case", kind: "write", risk: "low",
+  description: "Close the case when the work is genuinely complete and every party has what they need. Not for cases with open questions, unpaid invoices awaiting a decision, or unknown results.",
+  input: z.object({ reason: z.string(), outcome: z.string() }),
+  guard: async (i) => /unknown|not sure|pending|awaiting|unconfirmed/i.test(i.reason) ? "do not close a case with an unresolved or unknown element; escalate or hold instead" : null,
+  perform: async (i, ctx) => ctx.store.upsert("closures", rid("CL", ctx), { ...i, status: "closed", ...stamp(ctx) }),
+};
+
 export class UnknownResult extends Error {}
 
 async function doNotUse(propertyId: string, contractor: any, ctx: { store: any }): Promise<string | null> {
@@ -139,4 +162,4 @@ async function spendGuard(propertyId: string, cost: number, approvalRef: string 
   return cost > authority ? `estimated cost £${cost} exceeds landlord authority £${authority}; obtain approval (record_landlord_decision + approval_ref), use emergency=true with a justification if this is make-safe work, or escalate` : null;
 }
 
-export const WRITE_TOOLS: ToolDef[] = [createTicket, updateTicket, createWorkOrder, bookContractor, sendMessage, bookInspection, recordLandlordDecision, proposeAction, reportBlocker, escalate];
+export const WRITE_TOOLS: ToolDef[] = [createTicket, updateTicket, createWorkOrder, bookContractor, requestQuote, setHold, closeCase, sendMessage, bookInspection, recordLandlordDecision, proposeAction, reportBlocker, escalate];

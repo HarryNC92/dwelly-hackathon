@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { CaseSchema, type Case } from "../schemas/case.js";
 import { computeFlags } from "../runtime/flags.js";
+import { isDwellyCase, buildDwellyCase, type DwellyOptions } from "./dwelly.js";
 
 const FILE_EXT: Record<string, string> = { ".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif" };
 const SKIP = /^(readme|manifest|index|summary|\.ds_store|thumbs\.db)/i;
@@ -13,23 +14,35 @@ const MAX_TEXT = 80_000;
  * attachments passed to the model natively; anything else is read as text if it decodes. Ids come from the
  * organisers' names, never from order. README/manifest files at the top level are not cases.
  */
-export async function loadCases(dir: string): Promise<Case[]> {
+export async function loadCases(dir: string, opts: DwellyOptions = {}): Promise<Case[]> {
   const entries = (await fs.readdir(dir, { withFileTypes: true })).filter((e) => !e.name.startsWith(".") && !SKIP.test(e.name));
   const byId = new Map<string, string[]>();
+  const dwelly = new Map<string, string>();
   for (const e of entries) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
-      const files = (await fs.readdir(p)).filter((f) => !f.startsWith(".")).sort().map((f) => path.join(p, f));
+      if (await isDwellyCase(p)) { dwelly.set(e.name, p); continue; }
+      const files = (await walkFiles(p)).sort();
       byId.set(e.name, [...(byId.get(e.name) ?? []), ...files]);
     } else {
       const id = path.basename(e.name, path.extname(e.name));
       byId.set(id, [...(byId.get(id) ?? []), p]);
     }
   }
-  const ids = [...byId.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const ids = [...new Set([...byId.keys(), ...dwelly.keys()])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   const cases: Case[] = [];
-  for (const id of ids) cases.push(await buildCase(id, byId.get(id)!));
+  for (const id of ids) cases.push(dwelly.has(id) ? await buildDwellyCase(id, dwelly.get(id)!, opts) : await buildCase(id, byId.get(id)!));
   return cases;
+}
+
+async function walkFiles(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const e of await fs.readdir(dir, { withFileTypes: true })) {
+    if (e.name.startsWith(".")) continue;
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...(await walkFiles(p))); else out.push(p);
+  }
+  return out;
 }
 
 const stripBom = (s: string) => s.replace(/^\uFEFF/, "");

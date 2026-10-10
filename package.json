@@ -11,7 +11,8 @@
     "eval": "tsx src/eval.ts",
     "service": "tsx src/service.ts",
     "judge": "tsx src/judge.ts",
-    "scenarios": "tsx evals/scenarios.mts"
+    "scenarios": "tsx evals/scenarios.mts",
+    "cut": "tsx evals/cut.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.78",

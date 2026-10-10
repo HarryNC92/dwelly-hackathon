@@ -29,6 +29,8 @@ const program = new Command()
   .option("--no-group", "do not serialise cases that share a building")
   .option("--force", "re-run cases that already have a completed folder", false)
   .option("--only <ids>", "comma-separated case ids")
+  .option("--show-outcome", "organiser format: keep the Overview/Outcome sections (hidden by default, they reveal the ending)", false)
+  .option("--cuts <file>", "organiser format: JSON {caseId: lastEventNumber} to hide later events (decision-point training)")
   .parse();
 const o = program.opts();
 
@@ -70,9 +72,10 @@ async function main() {
   const models = o.mockModel ? mockModels() : realModels();
   if (!o.mockModel && !process.env.ANTHROPIC_API_KEY) { console.error("ANTHROPIC_API_KEY is not set"); process.exit(2); }
 
-  const allCases = await loadCases(path.resolve(o.cases));
+  const cuts = o.cuts ? JSON.parse(fs.readFileSync(path.resolve(o.cuts), "utf8")) : undefined;
+  const allCases = await loadCases(path.resolve(o.cases), { showOutcome: Boolean(o.showOutcome), cuts });
   const folderOf = new Map<string, string>();
-  allCases.forEach((c, i) => folderOf.set(c.id, o.numbered ? String(i + 1) : c.id)); // numbered before any filtering
+  allCases.forEach((c, i) => folderOf.set(c.id, o.numbered ? (/^\d+$/.test(c.id) ? String(Number(c.id)) : String(i + 1)) : c.id)); // numbered before any filtering; '003' -> '3'
   fs.writeFileSync(path.join(outDir, "index.json"), JSON.stringify(allCases.map((c) => ({ folder: folderOf.get(c.id), case_id: c.id, files: c.sourceFiles, channel: c.channel, received_at: c.receivedAt ?? null })), null, 2));
   let cases = allCases;
   if (o.only) { const ids = new Set(String(o.only).split(",")); cases = cases.filter((c) => ids.has(c.id)); }
