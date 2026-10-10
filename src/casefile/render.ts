@@ -25,7 +25,8 @@ export function renderCaseState(s: CaseState): string {
   if (s.workResults.present) L.push(`- Work results: event ${s.workResults.eventN}: ${s.workResults.summary ?? ""}`);
   if (s.invoice.present) L.push(`- Invoice: ${money(s.invoice.amountGbp) || "amount unknown"} (event ${s.invoice.eventN})${s.invoice.sentToLandlord ? ", sent to landlord" : ""}${s.invoice.paid ? ", landlord says paid" : ""}.`);
   if (s.keys.issued || s.keys.returned) L.push(`- Keys: ${[s.keys.issued ? "issued" : "", s.keys.returned ? "returned" : s.keys.issued ? "return not confirmed" : ""].filter(Boolean).join(", ")}.`);
-  L.push(`- Who pays: ${s.whoPays}.`);
+  L.push(`- Who pays: ${s.whoPays}${s.paymentRoute !== "unknown" ? ` via ${s.paymentRoute.replace(/_/g, " ")}` : ""}. Tenant liability: ${s.tenantLiability}. Work status: ${s.workStatus.replace(/_/g, " ")}.`);
+  if (s.documents.length) L.push(`- Documents: ${s.documents.map((d) => `${d.kind.replace(/_/g, " ")}${d.name ? ` ${d.name}` : ""}${d.eventN ? ` (event ${d.eventN})` : ""}${d.available ? "" : " UNAVAILABLE"}`).join("; ")}`);
   const open = s.holds.filter((h) => !h.released);
   if (open.length) L.push(`- Open hold: ${open.map((h) => `event ${h.eventN}${h.by ? ` by ${h.by}` : ""}, waiting for ${h.waitingFor}: ${h.reason}${h.comment ? ` — ${h.comment.slice(0, 120)}` : ""}`).join("; ")}`);
   else if (s.holds.length) L.push(`- Holds: ${s.holds.length}, none open.`);
