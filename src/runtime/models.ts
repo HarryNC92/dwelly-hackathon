@@ -8,5 +8,5 @@ export function realModels(): ModelFactory {
   return (id) => anthropic(id);
 }
 
-export const ROUTER_MODEL = process.env.ROUTER_MODEL ?? "claude-opus-5-5";
+export const ROUTER_MODEL = process.env.ROUTER_MODEL ?? "claude-sonnet-5-5"; // routing is low-stakes: the generalist is the floor
 export const FALLBACK_MODEL = process.env.FALLBACK_MODEL ?? "claude-sonnet-5-5";
