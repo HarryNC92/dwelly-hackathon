@@ -1,0 +1,2 @@
+{ "_why": "Provider dispatched before the landlord replied; two tenant names and two tenant phones in the dispatch emails; conditional pre-authorisation relayed to the contractor.",
+  "cut": 13, "stage": "awaiting_visit_date", "approval": "approved", "provider": "Oakfield Homes", "occupancy": "tenanted", "conflicts": ["Isaac Quinn", "phone"], "tier": "standard" }

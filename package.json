@@ -13,7 +13,8 @@
     "judge": "tsx src/judge.ts",
     "scenarios": "tsx evals/scenarios.mts",
     "cut": "tsx evals/cut.ts",
-    "capacity": "tsx src/capacity.ts"
+    "capacity": "tsx src/capacity.ts",
+    "casestate": "tsx src/casefile/cli.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.78",

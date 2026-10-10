@@ -1,0 +1,2 @@
+{ "_why": "Contractor reports the window repair complete, quoting the wrong property, before any visit date or quote approval was logged.",
+  "cut": 17, "stage": "close_out", "approval": "approved", "provider": "Riverside Solutions", "occupancy": "tenanted", "conflicts": ["Beacon Close"] }

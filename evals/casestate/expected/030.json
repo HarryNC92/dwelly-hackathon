@@ -1,0 +1,2 @@
+{ "_why": "Visit confirmed for a date the system says is a Monday but which is a Sunday; no work results three days after the visit.",
+  "cut": 34, "stage": "awaiting_results", "approval": "approved", "provider": "Willow Services", "occupancy": "tenanted", "conflicts": ["Monday 20th"] }
