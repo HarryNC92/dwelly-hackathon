@@ -1,41 +1,885 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Case board</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent action board</title>
 <style>
-:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--txt:#e8eaf0;--mut:#8b93a7;--ok:#2ecc71;--warn:#f1c40f;--bad:#e74c3c;--p0:#ff4d4f;--p1:#ffa940;--p2:#69c0ff}
-body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto}
-header{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline}
-h1{font-size:16px;margin:0;font-weight:600}.stats{color:var(--mut)}
-main{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px 20px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;transition:border-color .3s}
-.card.active{border-color:var(--warn)}.card.done{border-color:var(--ok)}.card.esc{border-color:var(--bad)}
-.id{font-weight:600;font-size:13px}.meta{color:var(--mut);font-size:12px;margin-top:4px}
-.badge{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;color:#000;margin-right:4px}
-.P0{background:var(--p0)}.P1{background:var(--p1)}.P2{background:var(--p2)}
-.steps{margin-top:8px;font-size:12px;color:var(--mut);max-height:120px;overflow:auto}
-.steps div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sum{margin-top:8px;font-size:12px}
-</style></head><body>
-<header><h1>Property operations · live case board</h1><div class="stats" id="stats">waiting for run…</div></header>
-<main id="main"></main>
+:root{
+  color-scheme:dark;
+  --bg:oklch(18% .012 268);
+  --bg2:oklch(22% .014 260);
+  --panel:oklch(23% .018 262);
+  --panel2:oklch(27% .018 262);
+  --line:oklch(36% .018 260);
+  --line-soft:oklch(31% .015 260);
+  --txt:oklch(91% .012 255);
+  --soft:oklch(70% .018 256);
+  --mut:oklch(55% .018 255);
+  --dim:oklch(43% .016 255);
+  --blue:oklch(64% .205 254);
+  --cyan:oklch(63% .155 218);
+  --teal:oklch(62% .125 205);
+  --warn:oklch(76% .16 78);
+  --bad:oklch(64% .18 28);
+  --ok:oklch(72% .13 154);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  margin:0;
+  min-height:100vh;
+  background:
+    radial-gradient(circle at 18% 35%, oklch(30% .045 248 / .28), transparent 34rem),
+    radial-gradient(circle at 72% 68%, oklch(24% .025 212 / .28), transparent 28rem),
+    linear-gradient(180deg,var(--bg2),var(--bg));
+  color:var(--txt);
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  letter-spacing:0;
+}
+button{
+  border:0;
+  font:inherit;
+}
+.shell{
+  min-height:100vh;
+  display:grid;
+  grid-template-rows:auto 1fr;
+}
+.topbar{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  padding:22px 32px 12px;
+  color:var(--soft);
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.mark{
+  width:32px;
+  height:32px;
+  border-radius:8px;
+  background:linear-gradient(150deg,var(--blue),var(--teal));
+  box-shadow:0 14px 38px oklch(53% .16 236 / .24);
+  position:relative;
+}
+.mark:before,.mark:after{
+  content:"";
+  position:absolute;
+  background:oklch(98% .006 250);
+  border-radius:2px;
+}
+.mark:before{width:18px;height:8px;left:7px;top:12px}
+.mark:after{width:8px;height:18px;left:12px;top:7px}
+h1{
+  margin:0;
+  font-size:14px;
+  font-weight:650;
+  color:var(--txt);
+}
+.meta{
+  color:var(--mut);
+  font-size:12px;
+  white-space:nowrap;
+}
+.stage{
+  display:grid;
+  grid-template-columns:minmax(360px,1fr) 1px minmax(280px,440px);
+  gap:0;
+  min-height:0;
+  padding:28px 32px 34px;
+}
+.rationale-wrap{
+  display:grid;
+  grid-template-rows:auto auto;
+  gap:22px;
+  align-items:center;
+  justify-items:center;
+  min-width:0;
+  padding:44px min(8vw,92px) 44px 22px;
+}
+.rationale-card{
+  width:min(100%,620px);
+  min-height:360px;
+  position:relative;
+  overflow:hidden;
+  cursor:pointer;
+  border-radius:28px;
+  padding:34px;
+  background:
+    radial-gradient(circle at 22% 12%, oklch(71% .19 259 / .88), transparent 22rem),
+    radial-gradient(circle at 76% 84%, oklch(56% .13 202 / .85), transparent 24rem),
+    linear-gradient(155deg,oklch(60% .215 260),oklch(57% .16 228) 48%,oklch(55% .13 204));
+  box-shadow:
+    0 28px 58px oklch(10% .03 260 / .46),
+    inset 0 1px 0 oklch(92% .02 250 / .24),
+    inset 0 -1px 0 oklch(18% .08 250 / .22);
+  transition:transform .18s ease-out, box-shadow .18s ease-out, filter .18s ease-out;
+}
+.rationale-card:hover,
+.rationale-card:focus-visible{
+  transform:translateY(-4px);
+  filter:saturate(1.06) brightness(1.03);
+  box-shadow:
+    0 34px 72px oklch(10% .03 260 / .56),
+    0 0 0 1px oklch(86% .05 230 / .28),
+    inset 0 1px 0 oklch(92% .02 250 / .3),
+    inset 0 -1px 0 oklch(18% .08 250 / .22);
+}
+.rationale-card:focus-visible{
+  outline:2px solid oklch(88% .07 230 / .88);
+  outline-offset:4px;
+}
+.rationale-card:hover .open-cue,
+.rationale-card:focus-visible .open-cue{
+  opacity:1;
+  transform:translateY(0);
+}
+.rationale-card:before,.rationale-card:after{
+  content:"";
+  position:absolute;
+  border:1px solid oklch(93% .02 250 / .18);
+  border-radius:999px;
+  pointer-events:none;
+}
+.rationale-card:before{
+  width:520px;
+  height:520px;
+  left:160px;
+  top:-108px;
+}
+.rationale-card:after{
+  width:300px;
+  height:300px;
+  left:190px;
+  top:74px;
+}
+.rationale-content{
+  position:relative;
+  z-index:1;
+  min-height:292px;
+  display:flex;
+  flex-direction:column;
+}
+.case-kicker{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:56px;
+}
+.case-id{
+  font-size:13px;
+  font-weight:750;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.rationale-title{
+  margin:auto 0 10px;
+  font-size:34px;
+  line-height:1.08;
+  font-weight:720;
+}
+.rationale-text{
+  max-width:62ch;
+  margin:0;
+  color:oklch(96% .006 245 / .88);
+  font-size:15px;
+}
+.rule-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:22px;
+}
+.open-cue{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  line-height:1;
+  padding-top:2px;
+  color:oklch(98% .006 245 / .9);
+  font-size:12px;
+  font-weight:720;
+  opacity:.76;
+  transform:translateY(0);
+  transition:opacity .18s ease-out, transform .18s ease-out;
+}
+.open-cue:after{
+  content:"";
+  width:7px;
+  height:7px;
+  border-top:2px solid currentColor;
+  border-right:2px solid currentColor;
+  transform:rotate(45deg);
+}
+.pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  padding:3px 9px;
+  border-radius:999px;
+  background:oklch(98% .006 245 / .16);
+  color:oklch(98% .006 245 / .88);
+  font-size:11px;
+  font-weight:700;
+}
+.divider{
+  width:1px;
+  background:linear-gradient(180deg,transparent,var(--line) 10%,var(--line) 88%,transparent);
+}
+.case-panel{
+  min-width:0;
+  padding:42px 0 42px min(7vw,92px);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.case-feed{
+  display:grid;
+  gap:13px;
+  max-height:min(660px,calc(100vh - 190px));
+  overflow:auto;
+  padding:4px 6px 4px 0;
+  scrollbar-color:var(--line) transparent;
+}
+.case-row{
+  display:grid;
+  grid-template-columns:18px minmax(0,1fr);
+  gap:12px;
+  align-items:start;
+  color:var(--dim);
+  background:transparent;
+  border-radius:8px;
+  padding:6px 8px 6px 0;
+  text-align:left;
+  cursor:pointer;
+}
+.case-row[data-active="true"]{
+  color:var(--txt);
+}
+.dot{
+  width:5px;
+  height:5px;
+  margin:9px auto 0;
+  border-radius:50%;
+  background:currentColor;
+}
+.log-main{
+  min-width:0;
+}
+.case-name{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:20px;
+  line-height:1.2;
+  font-weight:520;
+}
+.case-detail{
+  margin-top:4px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--mut);
+  font-size:12px;
+}
+.action-log-card{
+  width:min(100%,620px);
+  border-top:1px solid var(--line-soft);
+  padding-top:20px;
+}
+.action-log-title{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:12px;
+}
+.action-log-title h3{
+  margin:0;
+  font-size:12px;
+  font-weight:720;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  color:var(--txt);
+}
+.action-log-title span{
+  color:var(--mut);
+  font-size:12px;
+}
+.action-logs{
+  display:grid;
+  gap:8px;
+  max-height:176px;
+  overflow:auto;
+  scrollbar-color:var(--line) transparent;
+}
+.action-log{
+  display:grid;
+  grid-template-columns:16px minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  color:var(--soft);
+  padding:4px 0;
+}
+.action-log .dot{
+  width:4px;
+  height:4px;
+  margin-top:8px;
+}
+.action-name{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:14px;
+  line-height:1.25;
+  font-weight:620;
+}
+.action-detail{
+  margin-top:2px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--mut);
+  font-size:12px;
+}
+.empty{
+  color:var(--mut);
+  border:1px solid var(--line-soft);
+  border-radius:8px;
+  padding:18px;
+}
+.detail-view{
+  display:none;
+  min-height:calc(100vh - 86px);
+  padding:28px 32px 42px;
+}
+.detail-view[data-open="true"]{
+  display:block;
+}
+.detail-shell{
+  max-width:1160px;
+  margin:0 auto;
+}
+.crumbs{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:24px;
+  color:var(--mut);
+  font-size:13px;
+}
+.crumb-button{
+  color:var(--soft);
+  background:transparent;
+  padding:6px 0;
+  cursor:pointer;
+}
+.crumb-current{
+  color:var(--txt);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.detail-hero{
+  display:grid;
+  grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);
+  gap:28px;
+  align-items:start;
+  padding-bottom:28px;
+  border-bottom:1px solid var(--line-soft);
+}
+.detail-title{
+  margin:0;
+  font-size:38px;
+  line-height:1.08;
+  font-weight:730;
+}
+.detail-copy{
+  max-width:72ch;
+  margin:18px 0 0;
+  color:var(--soft);
+  font-size:16px;
+}
+.detail-meta{
+  display:grid;
+  gap:10px;
+  padding:18px;
+  border:1px solid var(--line-soft);
+  border-radius:8px;
+  background:oklch(21% .012 260 / .58);
+}
+.meta-row{
+  display:flex;
+  justify-content:space-between;
+  gap:18px;
+  border-bottom:1px solid var(--line-soft);
+  padding-bottom:9px;
+}
+.meta-row:last-child{
+  border-bottom:0;
+  padding-bottom:0;
+}
+.meta-row span:first-child{
+  color:var(--mut);
+}
+.meta-row span:last-child{
+  color:var(--txt);
+  text-align:right;
+}
+.detail-grid{
+  display:grid;
+  grid-template-columns:minmax(0,.88fr) minmax(0,1.12fr);
+  gap:32px;
+  margin-top:28px;
+}
+.evidence-panel{
+  min-width:0;
+}
+.panel-title{
+  margin:0 0 14px;
+  font-size:12px;
+  font-weight:740;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.evidence-stack{
+  display:grid;
+  gap:12px;
+}
+.evidence-box{
+  border:1px solid var(--line-soft);
+  border-radius:8px;
+  background:oklch(21% .012 260 / .44);
+  padding:16px;
+}
+.evidence-box h3{
+  margin:0 0 8px;
+  font-size:15px;
+}
+.evidence-box p,.evidence-box li{
+  color:var(--soft);
+}
+.evidence-box p{
+  margin:0;
+}
+.evidence-box ul{
+  margin:8px 0 0;
+  padding-left:18px;
+}
+.timeline{
+  display:grid;
+  gap:12px;
+  max-height:calc(100vh - 270px);
+  overflow:auto;
+  padding-right:8px;
+  scrollbar-color:var(--line) transparent;
+}
+.timeline-item{
+  display:grid;
+  grid-template-columns:22px minmax(0,1fr);
+  gap:12px;
+}
+.timeline-rail{
+  position:relative;
+}
+.timeline-rail:before{
+  content:"";
+  position:absolute;
+  left:10px;
+  top:20px;
+  bottom:-18px;
+  width:1px;
+  background:var(--line-soft);
+}
+.timeline-item:last-child .timeline-rail:before{
+  display:none;
+}
+.timeline-dot{
+  width:7px;
+  height:7px;
+  margin:7px auto 0;
+  border-radius:50%;
+  background:var(--dim);
+}
+.timeline-item[data-tone="good"] .timeline-dot{background:var(--ok)}
+.timeline-item[data-tone="bad"] .timeline-dot{background:var(--bad)}
+.timeline-item[data-tone="warn"] .timeline-dot{background:var(--warn)}
+.timeline-body{
+  min-width:0;
+  padding-bottom:8px;
+}
+.timeline-name{
+  font-size:16px;
+  font-weight:650;
+}
+.timeline-detail{
+  margin-top:3px;
+  color:var(--mut);
+  font-size:12px;
+}
+.timeline-extra{
+  margin-top:7px;
+  color:var(--soft);
+  font-size:13px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.skeleton{
+  opacity:.72;
+}
+@media (max-width:820px){
+  .topbar{padding:18px 20px 8px}
+  .topbar .meta{white-space:normal}
+  #stats{
+    width:100%;
+    padding-left:44px;
+    text-align:left;
+  }
+  .stage{
+    grid-template-columns:1fr;
+    padding:12px 20px 28px;
+  }
+  .rationale-wrap{
+    padding:22px 0 28px;
+  }
+  .rationale-card{
+    min-height:300px;
+    border-radius:22px;
+    padding:26px;
+  }
+  .rationale-title{
+    font-size:27px;
+  }
+  .divider{
+    display:none;
+  }
+  .case-panel{
+    padding:26px 0 0;
+  }
+  .case-feed{
+    max-height:none;
+  }
+  .action-logs{
+    max-height:220px;
+  }
+  .detail-view{
+    padding:18px 20px 32px;
+  }
+  .detail-hero,.detail-grid{
+    grid-template-columns:1fr;
+  }
+  .detail-title{
+    font-size:30px;
+  }
+  .timeline{
+    max-height:none;
+  }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>Agent action board</h1>
+        <div class="meta" id="caseMeta">waiting for run</div>
+      </div>
+    </div>
+    <div class="meta" id="stats">no data yet</div>
+  </header>
+  <main class="stage" id="boardView">
+    <section class="rationale-wrap" aria-label="Case rationale">
+      <article class="rationale-card" id="rationaleCard" role="button" tabindex="0" aria-label="Open case detail">
+        <div class="rationale-content">
+          <div class="case-kicker">
+            <div>
+              <div class="case-id" id="caseId">No case selected</div>
+              <div class="meta" id="caseStatus">queued</div>
+            </div>
+            <div class="open-cue">Open case</div>
+          </div>
+          <h2 class="rationale-title" id="rationaleTitle">Rationale</h2>
+          <p class="rationale-text" id="rationaleText">Run the service to populate the board with agent decisions.</p>
+          <div class="rule-row" id="ruleRow"></div>
+        </div>
+      </article>
+      <section class="action-log-card" aria-label="Related action logs">
+        <div class="action-log-title">
+          <h3>Action logs</h3>
+          <span id="logCount">0 entries</span>
+        </div>
+        <div class="action-logs" id="logs">
+          <div class="empty">Action logs will appear here as the agent works.</div>
+        </div>
+      </section>
+    </section>
+    <div class="divider" aria-hidden="true"></div>
+    <aside class="case-panel" aria-label="Cases">
+      <div class="case-feed" id="caseFeed">
+        <div class="empty">Cases will appear here after a run.</div>
+      </div>
+    </aside>
+  </main>
+  <section class="detail-view" id="detailView" aria-label="Case detail">
+    <div class="detail-shell">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <button class="crumb-button" id="backToBoard">Board</button>
+        <span aria-hidden="true">/</span>
+        <span class="crumb-current" id="detailCrumb">Case</span>
+      </nav>
+      <section class="detail-hero">
+        <div>
+          <h2 class="detail-title" id="detailTitle">Case detail</h2>
+          <p class="detail-copy" id="detailRationale">Select a case to inspect the chain of events.</p>
+          <div class="rule-row" id="detailRuleRow"></div>
+        </div>
+        <aside class="detail-meta" id="detailMeta"></aside>
+      </section>
+      <section class="detail-grid">
+        <aside class="evidence-panel">
+          <h3 class="panel-title">Next actions and escalation</h3>
+          <div class="evidence-stack" id="decisionEvidence"></div>
+        </aside>
+        <section class="evidence-panel">
+          <h3 class="panel-title">Chain of events</h3>
+          <div class="timeline" id="eventTimeline"></div>
+        </section>
+      </section>
+    </div>
+  </section>
+</div>
 <script>
-const label={ "case.start":"received","route":"triaged","prefetch":"records pulled","agent.start":"agent working","tool.read":"looked up","tool.staged":"staged","tool.blocked":"blocked by guard","checks":"checks","execute.success":"executed","execute.failure":"failed","execute.unknown":"unknown result","escalate.p0.call":"📞 on-call manager rang","agent.submit":"decided","case.end":"finished" };
+const eventLabels={
+  "case.start":"Received case",
+  "route":"Triaged case",
+  "prefetch":"Collected records",
+  "agent.start":"Started agent",
+  "agent.step":"Reasoned over case",
+  "tool.read":"Read records",
+  "tool.staged":"Prepared action",
+  "tool.blocked":"Blocked action",
+  "tool.control":"Submitted decision",
+  "checks":"Checked safeguards",
+  "execute.success":"Completed action",
+  "execute.failure":"Failed action",
+  "execute.unknown":"Unknown result",
+  "escalate.p0.call":"Placed urgent call",
+  "agent.submit":"Submitted resolution",
+  "case.end":"Finished case"
+};
+let selectedId=null;
+let casesCache=[];
+let detailOpen=false;
+
+const $=(id)=>document.getElementById(id);
+const esc=(value)=>String(value??"").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const titleCase=(value)=>String(value??"").replace(/[_-]+/g," ").replace(/\b\w/g,(c)=>c.toUpperCase());
+const clean=(value)=>String(value??"").replace(/[_-]+/g," ").trim();
+const timeOf=(ts)=>{
+  if(!ts)return "";
+  const d=new Date(ts);
+  if(Number.isNaN(d.getTime()))return "";
+  return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+};
+function descriptor(event){
+  if(event.name)return titleCase(event.name);
+  if(event.input?.Name)return titleCase(event.input.Name);
+  if(event.input?.name)return titleCase(event.input.name);
+  if(event.input?.title)return event.input.title;
+  if(event.tool)return titleCase(event.tool);
+  return eventLabels[event.event]||titleCase(event.event);
+}
+function detail(event){
+  const parts=[];
+  if(eventLabels[event.event]&&descriptor(event)!==eventLabels[event.event])parts.push(eventLabels[event.event]);
+  if(event.status)parts.push(clean(event.status));
+  if(event.problems?.length)parts.push(`${event.problems.length} issue${event.problems.length===1?"":"s"}`);
+  if(event.reason)parts.push(event.reason);
+  if(event.error)parts.push(event.error);
+  const when=timeOf(event.ts);
+  if(when)parts.push(when);
+  return parts.join(" · ");
+}
+function statusLabel(c){
+  return [clean(c.status||"queued"), c.urgency, c.family, c.agent].filter(Boolean).join(" · ");
+}
+function selectedCase(){
+  return casesCache.find((c)=>c.id===selectedId);
+}
+function shortValue(value){
+  if(value===undefined||value===null)return "";
+  if(typeof value==="string")return value;
+  if(typeof value==="number"||typeof value==="boolean")return String(value);
+  if(Array.isArray(value))return value.map(shortValue).filter(Boolean).slice(0,3).join(", ");
+  if(typeof value==="object"){
+    const priority=["to_party","channel","subject","body","property","scope","summary","decision_required","tier","reason","status","tool"];
+    const picked=priority.flatMap((k)=>value[k]!==undefined?[`${clean(k)}: ${shortValue(value[k])}`]:[]);
+    return picked.length?picked.slice(0,3).join(" · "):JSON.stringify(value).slice(0,160);
+  }
+  return String(value);
+}
+function eventTone(event){
+  if(/failure|error|blocked/.test(event.event)||["failure","blocked"].includes(event.status))return "bad";
+  if(/unknown|escalate/.test(event.event)||event.status==="unknown")return "warn";
+  if(/success|case.end|submit/.test(event.event)||event.status==="success")return "good";
+  return "neutral";
+}
+function evidenceList(items, emptyText){
+  const cleanItems=(items||[]).filter(Boolean);
+  return cleanItems.length?`<ul>${cleanItems.map((x)=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<p>${esc(emptyText)}</p>`;
+}
+function openDetail(){
+  const c=selectedCase();
+  if(!c)return;
+  detailOpen=true;
+  $("boardView").hidden=true;
+  $("detailView").dataset.open="true";
+  renderDetail(c);
+  window.scrollTo({top:0,behavior:"auto"});
+}
+function closeDetail(){
+  detailOpen=false;
+  $("boardView").hidden=false;
+  $("detailView").dataset.open="false";
+}
+function renderCases(cases){
+  const feed=$("caseFeed");
+  feed.innerHTML=cases.length?cases.map((c)=>`
+    <button class="case-row" data-id="${esc(c.id)}" data-active="${c.id===selectedId}">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="log-main">
+        <span class="case-name">${esc(c.id)}</span>
+        <span class="case-detail">${esc(statusLabel(c))}</span>
+      </span>
+    </button>`).join(""):`<div class="empty">Cases will appear here after a run.</div>`;
+  for(const btn of feed.querySelectorAll("button")){
+    btn.addEventListener("click",()=>{selectedId=btn.dataset.id; tick();});
+  }
+}
+function renderCase(c){
+  $("caseId").textContent=c?.id||"No case selected";
+  $("caseStatus").textContent=c?statusLabel(c):"queued";
+  $("caseMeta").textContent=c?statusLabel(c):"waiting for run";
+  const next=c?.nextAction?.type ? titleCase(c.nextAction.type) : c?.family ? titleCase(c.family) : "Rationale";
+  $("rationaleTitle").textContent=next;
+  $("rationaleText").textContent=c?.rationale||c?.summary||"The agent has not submitted a rationale for this case yet.";
+  const rules=[...(c?.rulesApplied||[]), c?.nextAction?.confidence ? `${titleCase(c.nextAction.confidence)} confidence` : ""].filter(Boolean).slice(0,5);
+  $("ruleRow").innerHTML=rules.map((r)=>`<span class="pill">${esc(r)}</span>`).join("");
+  const actionEvents=(c?.events||[]).filter((e)=>e.event!=="agent.step"||e.tool||e.name);
+  $("logCount").textContent=`${actionEvents.length} ${actionEvents.length===1?"entry":"entries"}`;
+  $("logs").innerHTML=actionEvents.length?actionEvents.slice(-10).reverse().map((e)=>`
+    <div class="action-log">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="log-main">
+        <span class="action-name">${esc(descriptor(e))}</span>
+        <span class="action-detail">${esc(detail(e))}</span>
+      </span>
+    </div>`).join(""):`<div class="empty">No actions recorded for this case yet.</div>`;
+}
+function renderDetail(c){
+  const actionEvents=(c?.events||[]).filter((e)=>e.event!=="agent.step"||e.tool||e.name);
+  const completed=actionEvents.filter((e)=>e.event==="execute.success").length;
+  const blocked=actionEvents.filter((e)=>/blocked|failure|unknown/.test(e.event)||["blocked","failure","unknown"].includes(e.status)).length;
+  const escalationEvents=actionEvents.filter((e)=>/escalate/i.test(e.event)||e.tool==="escalate");
+  const escalated=escalationEvents.length;
+  $("detailCrumb").textContent=c.id;
+  $("detailTitle").textContent=c.id;
+  $("detailRationale").textContent=c.rationale||c.summaryForHuman||c.summary||"No rationale has been submitted for this case yet.";
+  const rules=[...(c.rulesApplied||[]), c.nextAction?.confidence ? `${titleCase(c.nextAction.confidence)} confidence` : ""].filter(Boolean).slice(0,8);
+  $("detailRuleRow").innerHTML=rules.map((r)=>`<span class="pill">${esc(r)}</span>`).join("");
+  $("detailMeta").innerHTML=[
+    ["Status", clean(c.status||"queued")],
+    ["Urgency", c.urgency||"unknown"],
+    ["Family", c.family||"unknown"],
+    ["Agent", c.agent||"not started"],
+    ["Trace events", String((c.events||[]).length)],
+    ["Actions completed", String(completed)],
+  ].map(([k,v])=>`<div class="meta-row"><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("");
+
+  const next=c.nextAction;
+  const escInfo=c.escalation;
+  const decisionBlocks=[
+    `<article class="evidence-box"><h3>Next action</h3>${next?`
+      <p>${esc(titleCase(next.type))}</p>
+      <p class="timeline-detail">${esc([next.recipient&&`recipient: ${next.recipient}`, next.stage&&`stage: ${next.stage}`, next.confidence&&`${next.confidence} confidence`].filter(Boolean).join(" · "))}</p>`:
+      `<p>No next action recorded.</p>`}</article>`,
+    `<article class="evidence-box"><h3>Escalation</h3>${escInfo&&escInfo.tier&&escInfo.tier!=="none"?`
+      <p>${esc(escInfo.tier)}${escInfo.reason?`: ${esc(escInfo.reason)}`:""}</p>
+      ${escInfo.decisionRequired?`<p class="timeline-detail">Decision required: ${esc(escInfo.decisionRequired)}</p>`:""}
+      ${escInfo.deadline?`<p class="timeline-detail">Deadline: ${esc(escInfo.deadline)}</p>`:""}`:
+      escalationEvents.length?`
+      <p>${esc(escalationEvents.length)} escalation event${escalationEvents.length===1?"":"s"} recorded in the trace.</p>
+      <p class="timeline-detail">${esc(escalationEvents.map((e)=>descriptor(e)).slice(0,3).join(" · "))}</p>`:
+      `<p>No escalation required for this case.</p>`}</article>`,
+    `<article class="evidence-box"><h3>Execution health</h3>${evidenceList([
+      `${completed} completed action${completed===1?"":"s"}`,
+      `${blocked} blocked, failed, or unknown event${blocked===1?"":"s"}`,
+      `${escalated} escalation event${escalated===1?"":"s"}`,
+    ],"No execution events recorded.")}</article>`,
+    `<article class="evidence-box"><h3>Not done</h3>${evidenceList((c.notDone||[]).map((x)=>`${x.action}: ${x.reason}`),"No deliberately skipped actions recorded.")}</article>`,
+    `<article class="evidence-box"><h3>Gaps and conflicts</h3>${evidenceList([
+      ...(c.missingInformation||[]).map((x)=>`Missing: ${x}`),
+      ...(c.conflicts||[]).map((x)=>`Conflict: ${x.facts}${x.resolution?` (${x.resolution})`:""}`),
+    ],"No missing information or conflicts recorded.")}</article>`,
+  ];
+  $("decisionEvidence").innerHTML=decisionBlocks.join("");
+  $("eventTimeline").innerHTML=actionEvents.length?actionEvents.map((e)=>`
+    <article class="timeline-item" data-tone="${eventTone(e)}">
+      <div class="timeline-rail"><div class="timeline-dot"></div></div>
+      <div class="timeline-body">
+        <div class="timeline-name">${esc(descriptor(e))}</div>
+        <div class="timeline-detail">${esc([eventLabels[e.event]||clean(e.event), detail(e)].filter(Boolean).join(" · "))}</div>
+        ${e.input||e.reason||e.error?`<div class="timeline-extra">${esc(e.reason||e.error||shortValue(e.input))}</div>`:""}
+      </div>
+    </article>`).join(""):`<div class="empty">No event trace has been recorded for this case yet.</div>`;
+}
 async function tick(){
   try{
-    const r=await fetch('/api/status'); const d=await r.json();
-    const main=document.getElementById('main'); main.innerHTML='';
-    let done=0,esc=0,active=0;
-    for(const c of d.cases){
-      const last=c.events[c.events.length-1]||{};
-      const state=c.status||'queued'; if(state==='running')active++; else if(state==='escalated')esc++; else if(state!=='queued')done++;
-      const el=document.createElement('div'); el.className='card '+(state==='running'?'active':state==='escalated'?'esc':state==='queued'?'':'done');
-      const urg=c.urgency?`<span class="badge ${c.urgency}">${c.urgency}</span>`:'';
-      el.innerHTML=`<div class="id">${urg}${c.id}</div><div class="meta">${c.family||''} · ${state}${c.agent?' · '+c.agent:''}</div>
-        <div class="steps">${c.events.slice(-8).map(e=>`<div>${label[e.event]||e.event}${e.tool?' · '+e.tool:''}${e.problems&&e.problems.length?' · '+e.problems.length+' issue(s)':''}</div>`).join('')}</div>
-        ${c.summary?`<div class="sum">${c.summary}</div>`:''}`;
-      main.appendChild(el);
+    const r=await fetch("/api/status");
+    const d=await r.json();
+    const cases=d.cases||[];
+    casesCache=cases;
+    if(!selectedId||!cases.some((c)=>c.id===selectedId)){
+      selectedId=cases.find((c)=>c.status==="running")?.id||cases[0]?.id||null;
     }
-    document.getElementById('stats').textContent=`${d.cases.length} cases · ${active} working · ${done} done · ${esc} escalated`;
-  }catch(e){document.getElementById('stats').textContent='no data yet';}
+    let done=0,escCount=0,active=0;
+    for(const c of cases){
+      const state=c.status||"queued";
+      if(state==="running")active++;
+      else if(state==="escalated")escCount++;
+      else if(state!=="queued")done++;
+    }
+    $("stats").textContent=`${cases.length} cases · ${active} working · ${done} done · ${escCount} escalated`;
+    renderCases(cases);
+    renderCase(selectedCase());
+    if(detailOpen&&selectedCase())renderDetail(selectedCase());
+  }catch(e){
+    $("stats").textContent="no data yet";
+    $("caseFeed").innerHTML=`<div class="empty">Cases will appear here after a run.</div>`;
+    $("logCount").textContent="0 entries";
+    $("logs").innerHTML=`<div class="empty">The status endpoint is not available yet.</div>`;
+  }
 }
-tick(); setInterval(tick,1500);
-</script></body></html>
+$("rationaleCard").addEventListener("click",openDetail);
+$("rationaleCard").addEventListener("keydown",(e)=>{
+  if(e.key==="Enter"||e.key===" "){e.preventDefault();openDetail();}
+});
+$("backToBoard").addEventListener("click",closeDetail);
+tick();
+setInterval(tick,1500);
+</script>
+</body>
+</html>
