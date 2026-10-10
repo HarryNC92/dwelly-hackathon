@@ -51,6 +51,11 @@ Judge noise is about ±0.5 per case per run; treat mean deltas under 0.2 as nois
 5. Known weaknesses not yet addressed: quote figure/document not attached in some agency-initiated cases (003, 004); thanking the wrong contractor when two firms appear (018); over-escalating a landlord-known recurrent issue (014). All are policy nuances; only act if a session is idle and credits allow a two-case check.
 6. The capacity model (`pnpm capacity --out out/public-full-1 …`) and `docs/evidence/capacity-model.md` are evidence for the README.
 
+Landed:
+- 12:50 Item 1 merged (6d23a04): PM-GEN-002 check in `src/runtime/rules.ts`, a tenant message promising a provider fails checks unless the same resolution assigns or books one, or the case state already shows a provider assigned with work incomplete (Session 1's deliberate reading; strict variant is one line in `providerPromiseRule`). Scenarios now print 22 `=====` lines, 18/18 rule scenarios.
+- 12:50 Item 2 merged (429a3f9): `src/policies/agency.md` section 5 bullet and rule 16 on third-party contractor routes (025); section 10 requires the rationale to name stage, rule ids and evidence events. Generalist prompt 9,642 words.
+- Carried notes from Session 1, not acted on: policies do not mention `rulesApplied` or rule ids (agents learn them via check feedback); the PM-AUTH-001 approval note reaches trace and checks but not the agent's prompt for that turn.
+
 ## 6. The afternoon (London time; code and video freeze 16:30, results by 17:00)
 
 - 15:00 feature freeze on every branch; final merges by 15:10; `npx tsc --noEmit && pnpm smoke && pnpm scenarios` green on main; push.
