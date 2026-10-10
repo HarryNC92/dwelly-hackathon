@@ -38,6 +38,9 @@ Measured: 45 to 65 seconds per case, dominated by the agent's 6 to 10 steps on O
 ## Scores so far on their data (judge simulator, hidden endings as rubric)
 Fifteen cut public cases: 7.3 outcome / 7.4 judgement at the morning baseline; 8.3 / 8.1 with the state layer and the agency policy merged, 8.3 / 7.8 with the rule guards added on top (no guard misfires on real cases), no critical failures in any run (`out/public-real-2-judge.md` to `out/public-real-8-judge.md`). Remaining miss in most verdicts: not assigning or instructing the provider at intake, which the agency does immediately. Sample set with injected booking failure: 92/100 deterministic checks, reconciliation verified live.
 
+## Reality-Test-scale timing (measured)
+All fifty cut public cases at concurrency 10: 177 seconds end to end, no errors, no deadline skips (`out/public-full-1`). The 30-minute window has roughly ten times the headroom we need.
+
 ## Their data, now that we have seen it
 The public cases (fifty per track, already cloned into `HackatonPublicCases/`) are case files, not a CRM: `index.md` + `history.md` + `attachments/`, Northbridge Lettings, tenant or agency initiated, with the ending narrated in Overview and Outcome. The adapter hides those two sections, cuts histories at a decision point, and all fifty load with timestamps and numbered folders. The Reality Test will almost certainly be the same layout in a `HackatonChallendges/` folder. At 16:30: `git -C HackatonPublicCases pull`, confirm the folder name, then
 ```bash
