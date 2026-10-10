@@ -12,7 +12,13 @@ Rules for every session:
 
 The orchestrator (Jeremy's main session) owns: `src/schemas/*`, `src/orchestrator/*`, `src/runtime/runAgent.ts`, `src/run.ts`, `src/ingest/*`, `CONTEXT.md`, `MORNING.md`, `TASKS.md`, merges, and the real-model verification runs.
 
-Streams:
+Sessions actually open today (keep it to these):
+- Session 1 "state and rules": do handout A first, then B, in the same worktree (branch `stream/state-rules`). B's scenario tests go in `evals/scenarios.mts` as agreed.
+- Session 2 "policy": handout C (branch `stream/policy`).
+- Vedaant: handout E. Harry: handout F.
+- Handout D is folded: the orchestrator wires the red-flag gate and the capacity model; Session 1 adds the scripted scenarios; multi-cut materialisation is deferred unless time allows.
+
+Streams (reference):
 - A `handouts/A-case-state.md`: case state extraction and stage machine (`src/casefile/`).
 - B `handouts/B-rules-and-guards.md`: business rules as deterministic guards and checks (`src/tools/write.ts` guards, `src/runtime/checks.ts`, `src/runtime/flags.ts`).
 - C `handouts/C-policy.md`: agency policy and conventions (`src/policies/`).

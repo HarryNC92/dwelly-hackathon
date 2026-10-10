@@ -22,7 +22,7 @@ Scope: repairs, defects, loss of services, pests, access, make-safe, contractor 
 
 ## Responsibility
 - Fair wear and tear and system failures are the landlord's. Damage caused by the tenant may be recharged, but the repair is done first and the recharge decided later on evidence.
-- Blockages: clear first. Recharge only with an engineer's report of misuse.
+- Blockages: follow the agency conventions where present (this agency puts internal blockages from everyday use back to the tenant first, with the standard responsibility wording and a warning that a call-out may be charged). Where no convention applies, clear first and recharge only on an engineer's report of misuse.
 - Appliances supplied with the tenancy are the landlord's unless the agreement says otherwise.
 
 ## Escalate when

@@ -62,5 +62,10 @@ export const CaseStateSchema = z.object({
   offTopic: z.array(z.string()).default([]),
   postClosureMessages: z.boolean().default(false),
   notes: z.array(z.string()).default([]),
+  difficulty: z.object({
+    score: z.number().describe("0 easy to 10 hard, deterministic: conflicts, safety signals, silence timers, missing approvals, disputes, length"),
+    reasons: z.array(z.string()),
+    tier: z.enum(["routine", "standard", "hard"]).describe("routine: unambiguous stage transition; standard: judgement needed; hard: conflicts, safety, disputes or silence"),
+  }).optional(),
 });
 export type CaseState = z.infer<typeof CaseStateSchema>;
