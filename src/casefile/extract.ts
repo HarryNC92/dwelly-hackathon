@@ -447,6 +447,36 @@ export function extractCaseStateSync(events: HistoryEvent[], header: CaseHeader 
   const unavailable = ev.filter((e) => /unavailable|could not be extracted|\[(?:No )?[Tt]ext\/transcription|contents not provided|transcription (?:unavailable|absent|missing)/i.test(e.body)).map((e) => e.n);
   if (unavailable.length) notes.push(`${unavailable.length} event${unavailable.length > 1 ? "s" : ""} with unavailable attachments or transcripts (events ${unavailable.slice(0, 8).join(", ")}${unavailable.length > 8 ? "…" : ""})`);
 
+  // ---- triage-rule state fields (docs/triage-rules.md): payment route, tenant liability, work status, documents
+  let paymentRoute: CaseState["paymentRoute"] = "unknown";
+  if (/deduct(?:ed|ing)? (?:it |this |the cost )?from (?:the )?rent|rent deduction|take (?:it )?(?:out of|from) (?:the )?rent/i.test(all)) paymentRoute = "landlord_rent_deduction";
+  else if (/warranty|no charge|free of charge|at no cost|redone free|no cost to/i.test(all) && !/out of warranty|warranty (?:has )?expired/i.test(all)) paymentRoute = "warranty_or_free";
+  else if (whoPays === "tenant") paymentRoute = "tenant_chargeable";
+  else if (/pays? (?:the )?contractor directly|LL pays|landlord pays|paid directly|pay (?:the )?(?:invoice|contractor) directly|pass this for payment|please pay/i.test(all) || invoice.sentToLandlord) paymentRoute = "landlord_direct";
+  let tenantLiability: CaseState["tenantLiability"] = "unknown";
+  if (whoPays === "tenant" || /tenant'?s? (?:responsibility|liability)|chargeable to (?:the )?tenant|billed to you|at your own cost|tenant(?:'s)? (?:own )?(?:appliance|alteration)|unnecessary call.?out/i.test(all)) tenantLiability = "yes";
+  else if (/not (?:the )?tenant'?s? (?:fault|responsibility)|landlord'?s? responsibility|wear and tear|no charge to (?:the )?tenant|pre-?existing/i.test(all)) tenantLiability = "no";
+  let workStatus: CaseState["workStatus"] = "unknown";
+  const visitMs = visit.date ? new Date(visit.date + "Z").getTime() : undefined;
+  if (workResults.present) {
+    workStatus = "work_completed";
+    const afterDone = inbound.filter((e) => e.n > (workResults.eventN ?? 0));
+    if (afterDone.some((e) => /not (?:been )?(?:fixed|working|resolved|done)|still (?:not|broken|leaking|the same)|same (?:issue|problem|fault)|happened again|broken again|not happy|disappoint|complain|unacceptable/i.test(e.body))) workStatus = "disputed";
+  } else if (visitMs !== undefined && visitMs < nowMs) workStatus = "visit_completed";
+  else if (visitMs !== undefined) workStatus = "visit_scheduled";
+  else if (providerAssigned || ["intake", "landlord_gate", "dispatch", "awaiting_visit_date", "quote_loop", "paused_not_tenanted"].includes(stage)) workStatus = "not_started";
+  const documents: CaseState["documents"] = [];
+  const docKind = (s: string): CaseState["documents"][number]["kind"] => /quote|estimate/i.test(s) ? "quote" : /invoice/i.test(s) ? "invoice" : /inspection|check.?out|report/i.test(s) ? "inspection_report" : /photo|image|\.(?:jpe?g|png|webp|gif)$/i.test(s) ? "photo" : /complet/i.test(s) ? "completion_evidence" : "other";
+  const seenDocs = new Set<string>();
+  for (const e of ev) {
+    for (const a of e.attachments) { const name = a.replace(/^attachments\//, ""); if (seenDocs.has(name)) continue; seenDocs.add(name); documents.push({ kind: docKind(name), name, eventN: e.n, available: true }); }
+    for (const m of e.body.matchAll(/attachment-\d+-document\s*\((?:unavailable|contents not provided)[^)]*\)/gi)) { const key = `${e.n}:${m[0]}`; if (seenDocs.has(key)) continue; seenDocs.add(key); documents.push({ kind: docKind(e.body.slice(Math.max(0, m.index! - 120), m.index!)), name: m[0].split(/\s/)[0], eventN: e.n, available: false }); }
+    const added = e.body.match(/^Added document\(s\):\s*([^\n]+)/im);
+    if (added) documents.push({ kind: docKind(added[1]), name: added[1].slice(0, 80), eventN: e.n, available: !/unavailable|not provided|contents/i.test(added[1]) && e.attachments.length > 0 });
+    if (/referenced .{0,30}(?:photo|image).{0,30}unavailable|\[Three referenced|photos? (?:attachment )?unavailable/i.test(e.body)) documents.push({ kind: "photo", eventN: e.n, available: false });
+    if (/^Inspection document uploaded/im.test(e.body)) documents.push({ kind: "inspection_report", name: "inspection document (portal)", eventN: e.n, available: e.attachments.length > 0 });
+  }
+
   // ---- difficulty (deterministic, per handout A)
   const reasons: string[] = []; let score = 0;
   if (safetySignals.length) { score += 3; reasons.push(`+3 safety signal: ${safetySignals[0].replace(/ \(.*$/, "")}`); }
@@ -470,7 +500,7 @@ export function extractCaseStateSync(events: HistoryEvent[], header: CaseHeader 
     jobId, propertyAddress: header.propertyAddress || undefined, addressesMentioned,
     parties: [...parties.values()].filter((p) => p.names.length || p.emails.length || p.phones.length),
     stage, stageEvidenceEventN, occupancy, landlordApproval: approval, quotes, providerAssigned, remindersSent, visit, workResults, invoice, keys, holds,
-    openInterrupt, timers, lastEventTs: lastTs, lastInbound, whoPays, safetySignals, dataConflicts: conflicts.map((c) => c.text), offTopic,
+    openInterrupt, timers, lastEventTs: lastTs, lastInbound, whoPays, paymentRoute, tenantLiability, workStatus, documents, safetySignals, dataConflicts: conflicts.map((c) => c.text), offTopic,
     postClosureMessages: postClosure.length > 0, notes, difficulty: { score, reasons, tier },
   });
   return state;
