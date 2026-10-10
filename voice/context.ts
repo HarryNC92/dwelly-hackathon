@@ -3,7 +3,7 @@ import path from "node:path";
 
 /**
  * What the service can learn about a case from disk at escalation time, without importing the pipeline:
- * the trace the runner is writing (<OUT>/<case>/trace.jsonl) and, if CASES_DIR is set, the original report.
+ * the trace the runner is writing (<out>/<case>/trace.jsonl) and the original report in the cases directory.
  */
 export type CaseContext = { flags: string[]; report?: string; property?: string; tenant?: string; resolution?: any };
 
@@ -48,13 +48,13 @@ function readReport(casesDir: string, caseId: string): { text?: string; property
   return { text: text ? text.slice(0, 500) : undefined, property };
 }
 
-export function caseContext(outDir: string, caseId: string): CaseContext {
-  const events = readTrace(path.join(outDir, caseId, "trace.jsonl"));
+export function caseContext(outDirs: string[], caseId: string, casesDirs: string[]): CaseContext {
+  const traceFile = outDirs.map((d) => path.join(d, caseId, "trace.jsonl")).find((f) => fs.existsSync(f));
+  const events = traceFile ? readTrace(traceFile) : [];
   const start = events.find((e) => e.event === "case.start");
   const submits = events.filter((e) => e.event === "tool.control" && e.tool === "submit_resolution");
   const resolution = submits.at(-1)?.input;
-  const casesDir = process.env.CASES_DIR;
-  const report = casesDir ? readReport(path.resolve(casesDir), caseId) : {};
+  const report = casesDirs.map((d) => readReport(path.resolve(d), caseId)).find((r) => r.text) ?? {};
   return { flags: start?.flags ?? [], report: report.text, property: report.property, resolution };
 }
 

@@ -5,6 +5,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { caseContext, meaningful } from "../voice/context.js";
 import { playFor } from "../voice/playbook.js";
+import { spawn } from "node:child_process";
+import { sendMessage, validTwilioSignature } from "./transports/whatsapp.js";
 
 /**
  * Minimal HTTP service for the voice loop and inbound demo. No framework, runs anywhere, tunnel-friendly.
@@ -14,11 +16,46 @@ import { playFor } from "../voice/playbook.js";
  *   POST /api/webhooks/elevenlabs  post-call webhook (HMAC verified) -> writes <OUT>/<case>/callback.json
  *   GET  /                         live board (public/board.html)
  *   GET  /api/status               per-case status derived from trace files
- *   POST /api/inbound              Twilio SMS/WhatsApp webhook (form-encoded From/Body) or JSON -> writes a case into cases/live/
+ *   POST /api/inbound              Twilio SMS/WhatsApp webhook (form-encoded From/Body) or JSON -> writes a case into cases/live/,
+ *                                  runs the pipeline on it and replies on the same channel with the tenant messages it executed
  *   GET  /health
  */
 const OUT = path.resolve(process.env.OUT_DIR ?? "./ANSWERS");
 const PORT = Number(process.env.PORT ?? 8787);
+// Live inbound cases (WhatsApp/SMS) are written to LIVE_CASES and answered into LIVE_OUT by the normal runner.
+const LIVE_CASES = path.resolve("cases", "live");
+const LIVE_OUT = path.resolve(process.env.LIVE_OUT_DIR ?? "./out/live");
+const CASES_DIRS = [process.env.CASES_DIR, LIVE_CASES].filter(Boolean) as string[];
+
+/**
+ * Answers one live case with the normal runner (same pipeline, guards and checks as the judged run), then sends
+ * the tenant whatever messages the pipeline actually executed for them, on the channel they wrote in on.
+ * A P0 rings the on-call manager through ESCALATION_WEBHOOK_URL, pointed back at this service.
+ */
+function answerLiveCase(id: string, channel: string, from: string) {
+  const args = ["src/run.ts", "--cases", LIVE_CASES, "--only", id, "--out", LIVE_OUT, "--deadline", "5"];
+  if (process.env.DATA_DIR) args.push("--data", process.env.DATA_DIR);
+  if (!process.env.ANTHROPIC_API_KEY) args.push("--mock-model");
+  const env = { ...process.env, ESCALATION_WEBHOOK_URL: process.env.ESCALATION_WEBHOOK_URL ?? `http://localhost:${PORT}/api/escalations` };
+  const child = spawn(path.resolve("node_modules/.bin/tsx"), args, { env, stdio: ["ignore", "pipe", "pipe"] });
+  let log = "";
+  child.stdout.on("data", (d) => (log += d)); child.stderr.on("data", (d) => (log += d));
+  child.on("close", async (code) => {
+    const dir = path.join(LIVE_OUT, id);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "runner.log"), log);
+    const events = fs.existsSync(path.join(dir, "trace.jsonl")) ? fs.readFileSync(path.join(dir, "trace.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : [];
+    const staged = new Map(events.filter((e) => e.event === "tool.staged" && e.tool === "send_message").map((e) => [e.actionId, e.input]));
+    const sent = events.filter((e) => e.event === "execute.success" && staged.has(e.actionId)).map((e) => staged.get(e.actionId))
+      .filter((m: any) => /tenant|reporter|caller/i.test(String(m?.to_party ?? "")));
+    for (const m of sent) {
+      const result = await sendMessage(channel, from, String(m.body ?? ""));
+      fs.appendFileSync(path.join(dir, "replies.jsonl"), JSON.stringify({ ts: new Date().toISOString(), channel, to: from, body: m.body, result }) + "\n");
+      console.log(`reply to ${from} for ${id}: ${result.ok ? "sent" : result.error}`);
+    }
+    if (!sent.length) console.log(`no tenant message executed for ${id} (runner exit ${code}); nothing sent`);
+  });
+}
 
 /**
  * Turns an escalation into the agent's dynamic variables. Precedence: explicit fields in the POST
@@ -27,7 +64,7 @@ const PORT = Number(process.env.PORT ?? 8787);
  */
 function callBrief(body: any): Record<string, string> {
   const caseId = String(body.case_id ?? "unknown");
-  const ctx = caseContext(OUT, caseId);
+  const ctx = caseContext([OUT, LIVE_OUT], caseId, CASES_DIRS);
   const res = ctx.resolution ?? {};
   const play = playFor(ctx.flags);
   const pick = (...vals: unknown[]) => vals.find(meaningful) as string | undefined;
@@ -124,13 +161,20 @@ http.createServer(async (req, res) => {
       const raw = await readBody(req);
       let from = "", body = "", channel = "sms";
       if ((req.headers["content-type"] ?? "").includes("application/json")) { const j = JSON.parse(raw || "{}"); from = String(j.from ?? j.From ?? ""); body = String(j.body ?? j.Body ?? ""); channel = String(j.channel ?? "sms"); }
-      else { const p = new URLSearchParams(raw); from = p.get("From") ?? ""; body = p.get("Body") ?? ""; channel = from.startsWith("whatsapp:") ? "whatsapp" : "sms"; }
+      else {
+        const p = new URLSearchParams(raw);
+        if (process.env.PUBLIC_URL && !validTwilioSignature(`${process.env.PUBLIC_URL}/api/inbound`, p, req.headers["x-twilio-signature"] as string | undefined)) return json(res, 403, { error: "bad Twilio signature" });
+        from = p.get("From") ?? ""; body = p.get("Body") ?? ""; channel = from.startsWith("whatsapp:") ? "whatsapp" : "sms";
+      }
+      from = from.replace(/^whatsapp:/, "");
       const id = `live-${new Date().toISOString().replace(/[:.]/g, "-")}`;
-      const dir = path.join(process.cwd(), "cases", "live", id); fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, "message.json"), JSON.stringify({ channel, received_at: new Date().toISOString(), from: from.replace(/^whatsapp:/, ""), message: body }, null, 2));
+      const dir = path.join(LIVE_CASES, id); fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "message.json"), JSON.stringify({ channel, received_at: new Date().toISOString(), from, message: body }, null, 2));
       console.log(`inbound ${channel} from ${from}: case ${id}`);
-      // The runner picks it up: pnpm cases -- --cases ./cases/live --data ./data/<set> --out ./out/live
-      res.writeHead(200, { "content-type": "text/xml" }); return res.end("<Response></Response>");
+      answerLiveCase(id, channel, from);
+      // Immediate acknowledgement only; the substantive reply is whatever the pipeline decides to send.
+      res.writeHead(200, { "content-type": "text/xml" });
+      return res.end(`<Response><Message>Thanks, Northbridge Lettings has received your message (ref ${id.slice(5, 24)}). We're looking at it now and will reply here shortly.</Message></Response>`);
     }
     if (req.method === "POST" && url.pathname === "/api/webhooks/elevenlabs") {
       const raw = await readBody(req);
