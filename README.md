@@ -6,7 +6,7 @@ This repository contains a generalised triage, rationale and next-action engine 
 
 ## 1. What We Built
 
-We built a reusable decision program for property-management cases, not a solver for a fixed dataset. Its job is to read a new operational case, triage it, produce a rationale, select the next action, and preserve an audit trail that shows why that action was safe. It writes a judge-readable folder for every case containing `ANSWER.md`, `REASONING.md` and `trace.jsonl`, so an evaluator can see what the system received, looked up, decided, staged, executed, escalated, failed and deliberately did not do.
+We built a reusable decision program for property-management cases, not a solver for a fixed dataset. Its job is to read a new operational case, triage it, produce a rationale, select the next action, and preserve an audit trail that shows why that action was safe. It writes a human-readable folder for every case containing `ANSWER.md`, `REASONING.md` and `trace.jsonl`, so an evaluator can see what the system received, looked up, decided, staged, executed, escalated, failed and deliberately did not do.
 
 The important design choice is that judgement is split into three explicit outputs: triage, rationale and next action. The model can propose actions, but code checks them first. Only checked actions run, and the final answer is generated from execution results rather than from hopeful model prose. If an action fails or returns unknown, the system reconciles, withdraws unsafe pending messages, tries a safe recovery where possible, or escalates with an honest handover.
 
@@ -79,10 +79,10 @@ DRY_RUN=1 scripts/reality-test.sh "HackatonPublicCases/Property Management" 6
 Run the Reality Test when the challenge cases are available:
 
 ```bash
-scripts/reality-test.sh "HackatonPublicCases/HackatonChallendges/Property Management" 10
+scripts/reality-test.sh <challenge-repo-url> 10
 ```
 
-The script writes numbered folders to `ANSWERS/`, checks that each selected case has an `ANSWER.md`, commits `ANSWERS/` only, pushes, and prints the commit hash for the submission form. `DRY_RUN=1` writes to `out/rehearsal` and skips commit/push. `ONLY=003,027` can limit a rehearsal subset.
+The organisers publish the challenge repository URL at 16:30; the script clones it, finds the Property Management folder, writes numbered folders to `ANSWERS/`, checks that each selected case has an `ANSWER.md`, commits `ANSWERS/` only, pushes, and prints the commit hash for the submission form. `DRY_RUN=1` writes to `out/rehearsal` and skips commit/push. `ONLY=003,027` can limit a rehearsal subset.
 
 Demo board and voice endpoints:
 
@@ -105,10 +105,9 @@ Core runtime:
 Optional services:
 
 - ElevenLabs Agents and Twilio for the P0 on-call phone demo.
-- Resend for demo email paths.
 - TypeSafe AI Jev as an optional shadow classifier when `TYPESAFE_API_KEY` is set.
 
-The judged run does not require ElevenLabs, Twilio, Resend, Jev or hosted Postgres. With no `DATABASE_URL`, the record store is in-process PGlite.
+The judged run does not require ElevenLabs, Twilio, Jev or hosted Postgres. With no `DATABASE_URL`, the record store is in-process PGlite.
 
 ## 6. Assumptions
 
@@ -117,7 +116,7 @@ The judged run does not require ElevenLabs, Twilio, Resend, Jev or hosted Postgr
 - Public Dwelly practice cases are only one supported input shape. Overview and Outcome sections in those practice cases describe the ending, so the adapter hides them by default.
 - Landlord approval is required before contractor dispatch unless the visible case contains explicit pre-authorisation.
 - Quoted works, scope changes, liability decisions and rent deductions need explicit approval or escalation.
-- If no contractor panel or provider record exists, the system records a proposed action or human handover instead of inventing one.
+- When the case names no provider, the system assigns by trade through the platform provider step, as the organisers' cases do, and never invents a named contractor. Spend checks apply only when a landlord authority exists.
 - The record store is the audit copy unless a supplied API is wired behind the same wrapper.
 
 ## 7. Known Limitations
@@ -138,9 +137,9 @@ The judged run does not require ElevenLabs, Twilio, Resend, Jev or hosted Postgr
 
 ## How To Read An Answer
 
-After a run, open a case folder such as `out/sample/S02-gas-smell-call/`.
+Open the committed, unedited example output folder at `docs/evidence/example-case-008/`.
 
-`ANSWER.md` is the operational output. It starts with an execution status block generated from actual tool results, then gives the next action, decision, actions taken, recorded human handovers, failed or blocked actions, escalation, communications, full message text, conflicts, missing information, final state and summary. In the gas-smell sample, the answer shows the P0 safety path: gas emergency advice to the tenant, emergency contractor instruction, landlord update, EICR booking and human handover because the system has no phone tool.
+`ANSWER.md` is the operational output. It starts with an execution status block generated from actual tool results, then gives the next action, decision, actions taken, recorded human handovers, failed or blocked actions, escalation, communications, full message text, conflicts, missing information, final state and summary. In example case 008, the system handles an agency check-out job on a vacant flat: the landlord has asked for a comparison quote, so the next action is to assign a second provider for a quote only, set a provider hold with a chase date, and email the landlord. It sends no tenant message because nobody is in occupation, and it does not approve any works.
 
 `REASONING.md` is the audit trail in plain English. It shows the source files, deterministic flags, routing, records prefetched, every read/staged/executed tool action, the final decision, escalation, failures and automated check results. `trace.jsonl` is the machine-readable version with every model step, guard decision and execution result.
 
