@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { RecordStore } from "../backend/store.js";
 import type { FailureInjector } from "../backend/failures.js";
+import type { Case } from "../schemas/case.js";
 
 export type ToolKind = "read" | "write" | "control";
 export type ToolRisk = "none" | "low" | "high" | "prohibited";
@@ -11,6 +12,7 @@ export type ToolContext = {
   failures: FailureInjector;
   now: string; // dataset "now", never the wall clock
   actionId?: string; // set during execution of a staged write
+  case?: Case; // the case being worked, including `state` (CaseState) when the extraction step has filled it
   env: Record<string, string | undefined>;
 };
 

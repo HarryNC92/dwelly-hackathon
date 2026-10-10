@@ -113,7 +113,7 @@ async function main() {
       }
       const row = await runCase(c, {
         models, outDir, folder, caseTimeoutMs: Math.min(Number(o.caseTimeout) * 60_000, Math.max(60_000, deadlineAt + 120_000 - Date.now())),
-        ctxFor: (cc) => ({ caseId: cc.id, store, failures, now: cc.receivedAt ?? referenceNow, env: process.env }),
+        ctxFor: (cc) => ({ caseId: cc.id, case: cc, store, failures, now: cc.receivedAt ?? referenceNow, env: process.env }),
       });
       rows.push(row);
       console.log(`${row.folder}=${row.caseId}: ${row.status} ${row.family ?? ""} ${row.urgency ?? ""} esc=${row.escalation ?? "-"} agent=${row.agent ?? "-"} ${(row.ms / 1000).toFixed(0)}s${row.error ? ` ERROR ${row.error.slice(0, 120)}` : ""}`);
