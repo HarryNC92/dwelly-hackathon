@@ -40,6 +40,7 @@ export function runChecks(c: Case, res: Resolution, run: CaseRun): string[] {
     problems.push("no actions staged and nothing recorded as deliberately not done; either act, record why not, or escalate");
   }
   if (res.escalation.tier !== "none" && !actions.some((a) => a.tool === "escalate")) problems.push("resolution escalates but no escalate action was staged");
+  if (res.finalState === "on_hold" && !actions.some((a) => a.tool === "set_hold")) problems.push("final state on_hold requires a set_hold action naming who is waited on and until when");
   if (res.escalation.tier !== "none" && !res.escalation.decisionRequired) problems.push("escalation must say what decision a human is required to make");
   // A blocked action that the agent then restaged (same tool, later, live) is handled; only unhandled blocks need an explanation.
   const blocked = run.staged.filter((a, i) => a.status === "blocked" && !/withdrawn|superseded/.test(a.error ?? "") && !run.staged.slice(i + 1).some((b) => b.tool === a.tool && (b.status === "staged" || b.status === "success")));

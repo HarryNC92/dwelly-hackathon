@@ -20,7 +20,7 @@ export function writeAnswer(dir: string, c: Case, res: Resolution | null, run: C
       `- Executed: ${ok.length ? ok.map((a) => `${a.tool}${(a.input as any).contractor_id ? ` (${(a.input as any).contractor_id})` : ""}`).join(", ") : "nothing"}`,
       `- Failed or unknown: ${bad.length ? bad.map((a) => `${a.tool}${(a.input as any).contractor_id ? ` (${(a.input as any).contractor_id})` : ""} → ${a.status}: ${a.error ?? ""}`).join("; ") : "none"}`,
       `- Blocked by guards or checks: ${blocked.length ? blocked.map((a) => `${a.tool}: ${a.error ?? ""}`).join("; ") : "none"}`,
-      `- Human handover: ${meta.page ?? (res && res.escalation.tier !== "none" ? `tier ${res.escalation.tier} recorded` : "not required")}`,
+      `- Human handover: ${meta.page ?? (res && res.escalation.tier !== "none" ? `tier ${res.escalation.tier} recorded` : (run.staged.some((a) => a.status === "success" && ["propose_action", "report_blocker"].includes(a.tool)) ? `no escalation; ${run.staged.filter((a) => a.status === "success" && ["propose_action", "report_blocker"].includes(a.tool)).length} item(s) recorded for human review (see Recorded for a human)` : "not required"))}`,
     ];
     return `## Execution status (generated from execution results, not from the agent's text)\n${lines.join("\n")}`;
   };
