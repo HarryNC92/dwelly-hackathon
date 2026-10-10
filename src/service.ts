@@ -27,6 +27,42 @@ const LIVE_CASES = path.resolve("cases", "live");
 const LIVE_OUT = path.resolve(process.env.LIVE_OUT_DIR ?? "./out/live");
 const CASES_DIRS = [process.env.CASES_DIR, LIVE_CASES].filter(Boolean) as string[];
 
+/** Writes the message as a live case and starts answering it. Returns the case id. */
+function receiveMessage(channel: string, from: string, body: string): string {
+  from = from.replace(/^whatsapp:/, "");
+  const id = `live-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+  const dir = path.join(LIVE_CASES, id); fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "message.json"), JSON.stringify({ channel, received_at: new Date().toISOString(), from, message: body }, null, 2));
+  console.log(`inbound ${channel} from ${from}: case ${id}`);
+  answerLiveCase(id, channel, from);
+  return id;
+}
+const ackText = (id: string) => `Thanks, Northbridge Lettings has received your message (ref ${id.slice(5, 24)}). We're looking at it now and will reply here shortly.`;
+
+/**
+ * WHATSAPP_POLL=1: instead of the sandbox's console-only webhook, poll Twilio for new inbound WhatsApps to
+ * TWILIO_WHATSAPP_FROM every few seconds. No public URL needed. Only messages after service start are handled.
+ */
+function pollWhatsApp() {
+  const sid = process.env.TWILIO_ACCOUNT_SID, token = process.env.TWILIO_AUTH_TOKEN, to = process.env.TWILIO_WHATSAPP_FROM;
+  if (!sid || !token || !to) { console.log("WHATSAPP_POLL set but Twilio WhatsApp env missing; not polling"); return; }
+  const since = Date.now(), seen = new Set<string>();
+  const auth = "Basic " + Buffer.from(`${sid}:${token}`).toString("base64");
+  setInterval(async () => {
+    try {
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json?To=${encodeURIComponent(to)}&PageSize=20`, { headers: { Authorization: auth }, signal: AbortSignal.timeout(8000) });
+      const msgs: any[] = ((await r.json()) as any).messages ?? [];
+      for (const m of msgs.reverse()) {
+        if (seen.has(m.sid) || m.direction !== "inbound" || Date.parse(m.date_created) < since - 5000) continue;
+        seen.add(m.sid);
+        const id = receiveMessage("whatsapp", m.from, m.body ?? "");
+        void sendMessage("whatsapp", m.from, ackText(id));
+      }
+    } catch (e) { console.log("whatsapp poll error:", String(e).slice(0, 120)); }
+  }, 4000);
+  console.log(`polling WhatsApp inbound to ${to}`);
+}
+
 /**
  * Answers one live case with the normal runner (same pipeline, guards and checks as the judged run), then sends
  * the tenant whatever messages the pipeline actually executed for them, on the channel they wrote in on.
@@ -166,15 +202,10 @@ http.createServer(async (req, res) => {
         if (process.env.PUBLIC_URL && !validTwilioSignature(`${process.env.PUBLIC_URL}/api/inbound`, p, req.headers["x-twilio-signature"] as string | undefined)) return json(res, 403, { error: "bad Twilio signature" });
         from = p.get("From") ?? ""; body = p.get("Body") ?? ""; channel = from.startsWith("whatsapp:") ? "whatsapp" : "sms";
       }
-      from = from.replace(/^whatsapp:/, "");
-      const id = `live-${new Date().toISOString().replace(/[:.]/g, "-")}`;
-      const dir = path.join(LIVE_CASES, id); fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, "message.json"), JSON.stringify({ channel, received_at: new Date().toISOString(), from, message: body }, null, 2));
-      console.log(`inbound ${channel} from ${from}: case ${id}`);
-      answerLiveCase(id, channel, from);
+      const id = receiveMessage(channel, from, body);
       // Immediate acknowledgement only; the substantive reply is whatever the pipeline decides to send.
       res.writeHead(200, { "content-type": "text/xml" });
-      return res.end(`<Response><Message>Thanks, Northbridge Lettings has received your message (ref ${id.slice(5, 24)}). We're looking at it now and will reply here shortly.</Message></Response>`);
+      return res.end(`<Response><Message>${ackText(id)}</Message></Response>`);
     }
     if (req.method === "POST" && url.pathname === "/api/webhooks/elevenlabs") {
       const raw = await readBody(req);
@@ -200,4 +231,7 @@ http.createServer(async (req, res) => {
   } catch (e) {
     json(res, 500, { error: String(e) });
   }
-}).listen(PORT, () => console.log(`service on :${PORT}, output dir ${OUT}`));
+}).listen(PORT, () => {
+  console.log(`service on :${PORT}, output dir ${OUT}`);
+  if (process.env.WHATSAPP_POLL === "1") pollWhatsApp();
+});
