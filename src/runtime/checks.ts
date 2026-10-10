@@ -2,6 +2,7 @@ import type { Case } from "../schemas/case.js";
 import type { Resolution } from "../schemas/resolution.js";
 import type { CaseRun } from "./wrapper.js";
 import type { RecordStore } from "../backend/store.js";
+import { resolutionRules, formatHit } from "./rules.js";
 
 const live = (run: CaseRun) => run.staged.filter((a) => a.status === "staged" || a.status === "success");
 const DONE_WORDS = /\b(booked|instructed|on (the|their|its) way|will attend|attending|is coming|are coming|has been sent|have been sent|is being sent|dispatched|arranged for|scheduled for|confirmed for|coming (out|today|tonight|tomorrow))\b/i;
@@ -44,6 +45,10 @@ export function runChecks(c: Case, res: Resolution, run: CaseRun): string[] {
   // A blocked action that the agent then restaged (same tool, later, live) is handled; only unhandled blocks need an explanation.
   const blocked = run.staged.filter((a, i) => a.status === "blocked" && !/withdrawn|superseded/.test(a.error ?? "") && !run.staged.slice(i + 1).some((b) => b.tool === a.tool && (b.status === "staged" || b.status === "success")));
   if (blocked.length && res.escalation.tier === "none" && !res.notDone.length) problems.push(`blocked actions (${blocked.map((b) => b.tool).join(", ")}) were neither escalated nor recorded as not done`);
+  // Triage rules over the extracted case state (docs/triage-rules.md). Blocks are problems; warnings are problems only when unaddressed.
+  for (const h of resolutionRules(c.state, res, run, { channel: c.channel, now: c.receivedAt })) {
+    problems.push(h.severity === "block" ? formatHit(h) : `${formatHit(h)} Either act on it or cite ${h.id} in rulesApplied and say in the decision why not.`);
+  }
   return problems;
 }
 

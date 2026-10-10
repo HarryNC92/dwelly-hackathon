@@ -443,6 +443,7 @@ export function extractCaseStateSync(events: HistoryEvent[], header: CaseHeader 
   for (const e of ev) if (classified.get(e.n)?.kind === "description_changed") notes.push(`request description changed at event ${e.n}`);
   const intake = ev.find((e) => classified.get(e.n)?.kind === "intake_classification");
   if (intake) { const issue = intake.body.match(/Issue:\**\s*\n?\s*\**([^\n*]+)/)?.[1]?.trim(); const sev = intake.body.match(/Severity:\s*([A-Z]+)/)?.[1]; if (issue) notes.push(`AI intake classification: ${issue}${sev ? `, severity ${sev}` : ""} (event ${intake.n})`); }
+  for (const e of ev) if (/(?:authorisation|permission|consent) to (?:pass|share)|happy for (?:you|us) to (?:share|pass) (?:my|her|his|their|the) (?:details|number)|gave (?:consent|permission|authorisation)|tenant(?:s)? (?:consented|agreed to share)/i.test(e.body)) { notes.push(`tenant consent to share contact details recorded at event ${e.n}`); break; }
   if (postClosure.length) notes.push(`${postClosure.length} message${postClosure.length > 1 ? "s" : ""} received after closure (event ${closedAtN})`);
   const unavailable = ev.filter((e) => /unavailable|could not be extracted|\[(?:No )?[Tt]ext\/transcription|contents not provided|transcription (?:unavailable|absent|missing)/i.test(e.body)).map((e) => e.n);
   if (unavailable.length) notes.push(`${unavailable.length} event${unavailable.length > 1 ? "s" : ""} with unavailable attachments or transcripts (events ${unavailable.slice(0, 8).join(", ")}${unavailable.length > 8 ? "…" : ""})`);
