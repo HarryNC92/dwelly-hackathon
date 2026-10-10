@@ -6,23 +6,23 @@
 <title>Agent action board</title>
 <style>
 :root{
-  color-scheme:dark;
-  --bg:oklch(18% .012 268);
-  --bg2:oklch(22% .014 260);
-  --panel:oklch(23% .018 262);
-  --panel2:oklch(27% .018 262);
-  --line:oklch(36% .018 260);
-  --line-soft:oklch(31% .015 260);
-  --txt:oklch(91% .012 255);
-  --soft:oklch(70% .018 256);
-  --mut:oklch(55% .018 255);
-  --dim:oklch(43% .016 255);
+  color-scheme:light;
+  --bg:oklch(94% .012 255);
+  --bg2:oklch(98% .008 252);
+  --panel:oklch(99% .004 255);
+  --panel2:oklch(96% .01 252);
+  --line:oklch(78% .018 252);
+  --line-soft:oklch(88% .014 252);
+  --txt:oklch(23% .022 258);
+  --soft:oklch(41% .026 258);
+  --mut:oklch(55% .024 258);
+  --dim:oklch(68% .02 255);
   --blue:oklch(64% .205 254);
   --cyan:oklch(63% .155 218);
   --teal:oklch(62% .125 205);
-  --warn:oklch(76% .16 78);
-  --bad:oklch(64% .18 28);
-  --ok:oklch(72% .13 154);
+  --warn:oklch(70% .14 78);
+  --bad:oklch(56% .17 28);
+  --ok:oklch(58% .13 154);
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -30,8 +30,8 @@ body{
   margin:0;
   min-height:100vh;
   background:
-    radial-gradient(circle at 18% 35%, oklch(30% .045 248 / .28), transparent 34rem),
-    radial-gradient(circle at 72% 68%, oklch(24% .025 212 / .28), transparent 28rem),
+    radial-gradient(circle at 18% 34%, oklch(83% .055 245 / .42), transparent 34rem),
+    radial-gradient(circle at 76% 72%, oklch(86% .05 205 / .38), transparent 30rem),
     linear-gradient(180deg,var(--bg2),var(--bg));
   color:var(--txt);
   font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
@@ -66,7 +66,7 @@ button{
   height:32px;
   border-radius:8px;
   background:linear-gradient(150deg,var(--blue),var(--teal));
-  box-shadow:0 14px 38px oklch(53% .16 236 / .24);
+  box-shadow:0 14px 34px oklch(58% .13 236 / .24);
   position:relative;
 }
 .mark:before,.mark:after{
@@ -106,18 +106,19 @@ h1{
 }
 .rationale-card{
   width:min(100%,620px);
-  min-height:360px;
+  min-height:344px;
   position:relative;
   overflow:hidden;
   cursor:pointer;
-  border-radius:28px;
-  padding:34px;
+  border-radius:20px;
+  padding:30px;
+  color:oklch(16% .035 258);
   background:
     radial-gradient(circle at 22% 12%, oklch(71% .19 259 / .88), transparent 22rem),
     radial-gradient(circle at 76% 84%, oklch(56% .13 202 / .85), transparent 24rem),
     linear-gradient(155deg,oklch(60% .215 260),oklch(57% .16 228) 48%,oklch(55% .13 204));
   box-shadow:
-    0 28px 58px oklch(10% .03 260 / .46),
+    0 28px 58px oklch(45% .055 255 / .28),
     inset 0 1px 0 oklch(92% .02 250 / .24),
     inset 0 -1px 0 oklch(18% .08 250 / .22);
   transition:transform .18s ease-out, box-shadow .18s ease-out, filter .18s ease-out;
@@ -127,8 +128,8 @@ h1{
   transform:translateY(-4px);
   filter:saturate(1.06) brightness(1.03);
   box-shadow:
-    0 34px 72px oklch(10% .03 260 / .56),
-    0 0 0 1px oklch(86% .05 230 / .28),
+    0 34px 72px oklch(45% .055 255 / .36),
+    0 0 0 1px oklch(66% .11 230 / .36),
     inset 0 1px 0 oklch(92% .02 250 / .3),
     inset 0 -1px 0 oklch(18% .08 250 / .22);
 }
@@ -163,7 +164,7 @@ h1{
 .rationale-content{
   position:relative;
   z-index:1;
-  min-height:292px;
+  min-height:284px;
   display:flex;
   flex-direction:column;
 }
@@ -172,25 +173,39 @@ h1{
   align-items:flex-start;
   justify-content:space-between;
   gap:16px;
-  margin-bottom:56px;
+  margin-bottom:48px;
+}
+.case-kicker > div:first-child{
+  min-width:0;
 }
 .case-id{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
   font-size:13px;
   font-weight:750;
   text-transform:uppercase;
   letter-spacing:.04em;
+  text-shadow:0 1px 1px oklch(95% .02 245 / .28);
+}
+.rationale-card .meta{
+  color:oklch(21% .035 258 / .92);
+  font-weight:650;
+  text-shadow:0 1px 1px oklch(95% .02 245 / .24);
 }
 .rationale-title{
   margin:auto 0 10px;
   font-size:34px;
   line-height:1.08;
   font-weight:720;
+  text-shadow:0 1px 1px oklch(95% .02 245 / .22);
 }
 .rationale-text{
   max-width:62ch;
   margin:0;
-  color:oklch(96% .006 245 / .88);
+  color:oklch(18% .03 258 / .9);
   font-size:15px;
+  text-shadow:0 1px 1px oklch(95% .02 245 / .18);
 }
 .rule-row{
   display:flex;
@@ -199,17 +214,20 @@ h1{
   margin-top:22px;
 }
 .open-cue{
+  flex:0 0 auto;
   display:inline-flex;
   align-items:center;
   gap:6px;
   line-height:1;
-  padding-top:2px;
-  color:oklch(98% .006 245 / .9);
+  padding-top:1px;
+  color:oklch(14% .034 258 / .86);
   font-size:12px;
   font-weight:720;
+  white-space:nowrap;
   opacity:.76;
   transform:translateY(0);
   transition:opacity .18s ease-out, transform .18s ease-out;
+  text-shadow:0 1px 1px oklch(95% .02 245 / .2);
 }
 .open-cue:after{
   content:"";
@@ -225,8 +243,8 @@ h1{
   min-height:24px;
   padding:3px 9px;
   border-radius:999px;
-  background:oklch(98% .006 245 / .16);
-  color:oklch(98% .006 245 / .88);
+  background:oklch(20% .025 258 / .12);
+  color:oklch(24% .025 258 / .84);
   font-size:11px;
   font-weight:700;
 }
@@ -241,6 +259,14 @@ h1{
   flex-direction:column;
   justify-content:center;
 }
+.feed-title{
+  margin:0 0 16px;
+  font-size:12px;
+  font-weight:720;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  color:var(--txt);
+}
 .case-feed{
   display:grid;
   gap:13px;
@@ -254,15 +280,58 @@ h1{
   grid-template-columns:18px minmax(0,1fr);
   gap:12px;
   align-items:start;
-  color:var(--dim);
+  color:var(--status-muted,var(--dim));
   background:transparent;
   border-radius:8px;
   padding:6px 8px 6px 0;
   text-align:left;
   cursor:pointer;
+  transition:color .16s ease-out, transform .16s ease-out;
 }
 .case-row[data-active="true"]{
-  color:var(--txt);
+  color:var(--status-strong,var(--txt));
+}
+.case-row:hover,
+.case-row:focus-visible{
+  color:var(--status-strong,var(--txt));
+  transform:translateX(2px);
+}
+.case-row:focus-visible{
+  outline:2px solid var(--status-ring,oklch(72% .08 235 / .45));
+  outline-offset:3px;
+}
+.case-row[data-status="scheduled"]{
+  --status-strong:oklch(40% .12 154);
+  --status-muted:oklch(62% .07 154);
+  --status-ring:oklch(66% .12 154 / .34);
+}
+.case-row[data-status="escalated"]{
+  --status-strong:oklch(49% .18 28);
+  --status-muted:oklch(66% .105 28);
+  --status-ring:oklch(68% .16 28 / .34);
+}
+.case-row[data-status="running"]{
+  --status-strong:oklch(47% .13 255);
+  --status-muted:oklch(66% .08 255);
+  --status-ring:oklch(68% .13 255 / .34);
+}
+.case-row[data-status="queued"]{
+  --status-strong:oklch(38% .025 258);
+  --status-muted:oklch(68% .02 255);
+  --status-ring:oklch(68% .03 258 / .28);
+}
+.case-row[data-status="blocked"],
+.case-row[data-status="failed"]{
+  --status-strong:oklch(42% .14 48);
+  --status-muted:oklch(63% .085 48);
+  --status-ring:oklch(66% .13 48 / .34);
+}
+.case-row[data-status="resolved"],
+.case-row[data-status="done"],
+.case-row[data-status="closed_no_action"]{
+  --status-strong:oklch(42% .085 192);
+  --status-muted:oklch(62% .06 192);
+  --status-ring:oklch(66% .1 192 / .32);
 }
 .dot{
   width:5px;
@@ -270,6 +339,9 @@ h1{
   margin:9px auto 0;
   border-radius:50%;
   background:currentColor;
+}
+.case-row .dot{
+  box-shadow:0 0 0 4px color-mix(in oklch,currentColor 14%,transparent);
 }
 .log-main{
   min-width:0;
@@ -288,7 +360,7 @@ h1{
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  color:var(--mut);
+  color:color-mix(in oklch,currentColor 58%,var(--mut));
   font-size:12px;
 }
 .action-log-card{
@@ -416,7 +488,8 @@ h1{
   padding:18px;
   border:1px solid var(--line-soft);
   border-radius:8px;
-  background:oklch(21% .012 260 / .58);
+  background:oklch(99% .004 255 / .76);
+  box-shadow:0 18px 44px oklch(60% .03 255 / .14);
 }
 .meta-row{
   display:flex;
@@ -459,8 +532,9 @@ h1{
 .evidence-box{
   border:1px solid var(--line-soft);
   border-radius:8px;
-  background:oklch(21% .012 260 / .44);
+  background:oklch(99% .004 255 / .72);
   padding:16px;
+  box-shadow:0 14px 36px oklch(60% .03 255 / .1);
 }
 .evidence-box h3{
   margin:0 0 8px;
@@ -471,6 +545,16 @@ h1{
 }
 .evidence-box p{
   margin:0;
+}
+.cost-figure{
+  margin:0;
+  color:var(--txt);
+  font-size:28px;
+  line-height:1.1;
+  font-weight:730;
+}
+.cost-note{
+  margin-top:8px!important;
 }
 .evidence-box ul{
   margin:8px 0 0;
@@ -554,9 +638,9 @@ h1{
     padding:22px 0 28px;
   }
   .rationale-card{
-    min-height:300px;
-    border-radius:22px;
-    padding:26px;
+    min-height:292px;
+    border-radius:18px;
+    padding:24px;
   }
   .rationale-title{
     font-size:27px;
@@ -628,6 +712,7 @@ h1{
     </section>
     <div class="divider" aria-hidden="true"></div>
     <aside class="case-panel" aria-label="Cases">
+      <h3 class="feed-title">Cases</h3>
       <div class="case-feed" id="caseFeed">
         <div class="empty">Cases will appear here after a run.</div>
       </div>
@@ -716,6 +801,21 @@ function detail(event){
 function statusLabel(c){
   return [clean(c.status||"queued"), c.urgency, c.family, c.agent].filter(Boolean).join(" · ");
 }
+function statusTone(c){
+  return String(c?.status||"queued").toLowerCase().replace(/[^a-z0-9_-]/g,"_");
+}
+function formatCost(cost){
+  if(!cost||typeof cost.amountGbp!=="number")return "Not estimated yet";
+  const value=new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP"}).format(cost.amountGbp);
+  const vat=cost.vat==="plus"?" + VAT":cost.vat==="inc"?" inc VAT":"";
+  return `${value}${vat}`;
+}
+function costDetail(cost){
+  if(!cost)return "No cost field has been recorded for this case.";
+  if(typeof cost.amountGbp!=="number")return "Awaiting a quote, invoice, or estimated cost.";
+  const parts=[cost.status&&cost.status!=="unknown"?titleCase(cost.status):"", cost.source&&`source: ${cost.source}`].filter(Boolean);
+  return parts.join(" · ")||cost.note||"No cost field has been recorded for this case.";
+}
 function selectedCase(){
   return casesCache.find((c)=>c.id===selectedId);
 }
@@ -758,7 +858,7 @@ function closeDetail(){
 function renderCases(cases){
   const feed=$("caseFeed");
   feed.innerHTML=cases.length?cases.map((c)=>`
-    <button class="case-row" data-id="${esc(c.id)}" data-active="${c.id===selectedId}">
+    <button class="case-row" data-id="${esc(c.id)}" data-active="${c.id===selectedId}" data-status="${esc(statusTone(c))}">
       <span class="dot" aria-hidden="true"></span>
       <span class="log-main">
         <span class="case-name">${esc(c.id)}</span>
@@ -805,6 +905,7 @@ function renderDetail(c){
     ["Urgency", c.urgency||"unknown"],
     ["Family", c.family||"unknown"],
     ["Agent", c.agent||"not started"],
+    ["Cost", formatCost(c.cost)],
     ["Trace events", String((c.events||[]).length)],
     ["Actions completed", String(completed)],
   ].map(([k,v])=>`<div class="meta-row"><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("");
@@ -812,6 +913,10 @@ function renderDetail(c){
   const next=c.nextAction;
   const escInfo=c.escalation;
   const decisionBlocks=[
+    `<article class="evidence-box"><h3>Case cost</h3>
+      <p class="cost-figure">${esc(formatCost(c.cost))}</p>
+      <p class="timeline-detail cost-note">${esc(costDetail(c.cost))}</p>
+    </article>`,
     `<article class="evidence-box"><h3>Next action</h3>${next?`
       <p>${esc(titleCase(next.type))}</p>
       <p class="timeline-detail">${esc([next.recipient&&`recipient: ${next.recipient}`, next.stage&&`stage: ${next.stage}`, next.confidence&&`${next.confidence} confidence`].filter(Boolean).join(" · "))}</p>`:

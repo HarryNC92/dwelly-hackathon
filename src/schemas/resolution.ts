@@ -33,6 +33,14 @@ export const EscalationSchema = z.object({
   handover: z.string().optional(),
 });
 
+export const CostSchema = z.object({
+  amountGbp: z.number().optional(),
+  vat: z.enum(["inc", "plus", "unknown"]).default("unknown"),
+  status: z.enum(["estimated", "quoted", "invoiced", "approved", "none", "unknown"]).default("unknown"),
+  source: z.string().optional(),
+  note: z.string().optional(),
+});
+
 /** The payload of the submit_resolution tool. Strict-schema friendly: no min/max, no recursion. */
 export const ResolutionSchema = z.object({
   family: FamilySchema,
@@ -45,6 +53,7 @@ export const ResolutionSchema = z.object({
   flagAssessments: z.array(z.object({ flag: z.string(), falsePositive: z.boolean(), reason: z.string() })).describe("One entry per deterministic flag you were given: whether it is a false positive and why"),
   communications: z.array(z.object({ party: z.string(), channel: z.string(), gist: z.string() })),
   escalation: EscalationSchema,
+  cost: CostSchema.optional().describe("Known or estimated case cost in GBP, if the case file or staged action gives one"),
   finalState: z.enum(["resolved", "scheduled", "on_hold", "awaiting_approval", "escalated", "closed_no_action", "blocked"]).describe("on_hold: the case waits on a named party with a timer and nothing else is owed"),
   nextAction: z.object({
     type: z.enum(["message_landlord", "message_tenant", "message_provider", "request_clarification", "assign_provider", "request_landlord_approval", "request_quote", "hold_waiting_for_landlord", "hold_waiting_for_tenant", "hold_waiting_for_provider", "escalate_human_review", "escalate_safety", "close_without_payment", "close_after_final_checks", "no_action_timer_not_expired"]),

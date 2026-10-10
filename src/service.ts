@@ -205,6 +205,57 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => resolve(b)); });
 }
 
+type CaseCost = {
+  amountGbp?: number;
+  vat: "inc" | "plus" | "unknown";
+  status: "estimated" | "quoted" | "invoiced" | "approved" | "none" | "unknown";
+  source?: string;
+  note?: string;
+};
+const COST_KEY = /(?:^|_)(?:estimated_)?(?:cost|amount|quote|invoice)(?:_gbp|gbp|_amount)?$/i;
+function moneyNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return undefined;
+  const match = value.match(/£?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/);
+  return match ? Number(match[1].replace(/,/g, "")) : undefined;
+}
+function costStatus(key: string, source: string): CaseCost["status"] {
+  const text = `${key} ${source}`.toLowerCase();
+  if (text.includes("invoice")) return "invoiced";
+  if (text.includes("quote")) return "quoted";
+  if (text.includes("approved")) return "approved";
+  if (text.includes("estimate") || text.includes("cost")) return "estimated";
+  return "unknown";
+}
+function costFromRecord(record: unknown, source: string, depth = 0): CaseCost | undefined {
+  if (!record || typeof record !== "object" || depth > 3) return undefined;
+  for (const [key, value] of Object.entries(record as Record<string, unknown>)) {
+    if (COST_KEY.test(key)) {
+      const amountGbp = moneyNumber(value);
+      if (amountGbp !== undefined) return { amountGbp, vat: "unknown", status: costStatus(key, source), source };
+    }
+    if (typeof value === "string" && /£\s*[0-9]/.test(value) && /(cost|quote|invoice|estimate|amount|price|charge)/i.test(value)) {
+      const amountGbp = moneyNumber(value);
+      if (amountGbp !== undefined) return { amountGbp, vat: /\+\s*VAT/i.test(value) ? "plus" : /inc(?:luding)?\.?\s*VAT/i.test(value) ? "inc" : "unknown", status: costStatus(key, source), source, note: value.slice(0, 180) };
+    }
+    const nested = costFromRecord(value, source, depth + 1);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+function caseCost(events: any[], resolution: any): CaseCost {
+  const direct = costFromRecord(resolution?.cost, "resolution");
+  if (direct) return direct;
+  const fromResolution = costFromRecord(resolution, "resolution");
+  if (fromResolution) return fromResolution;
+  for (const event of [...events].reverse()) {
+    const source = event.name ?? event.tool ?? event.event ?? "trace";
+    const found = costFromRecord(event.input ?? event, String(source));
+    if (found) return found;
+  }
+  return { vat: "unknown", status: "unknown", note: "Not estimated yet" };
+}
+
 http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://x");
   try {
@@ -230,6 +281,7 @@ http.createServer(async (req, res) => {
           summaryForHuman: resolution?.summaryForHuman,
           nextAction: resolution?.nextAction,
           escalation: resolution?.escalation,
+          cost: caseCost(events, resolution),
           rulesApplied: resolution?.rulesApplied,
           notDone: resolution?.notDone,
           conflicts: resolution?.conflicts,
