@@ -30,15 +30,15 @@ export const updateTicket: ToolDef = {
 export const createWorkOrder: ToolDef = {
   name: "create_work_order", kind: "write", risk: "high",
   description: "Instruct work on a property. Requires an estimated cost; spend above landlord authority without a recorded approval is refused.",
-  input: z.object({ property_id: z.string(), ticket_id: z.string().optional(), contractor_id: z.string().optional(), scope: z.string(), estimated_cost_gbp: z.number(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record that approves this spend"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
+  input: z.object({ property_id: z.string().describe("Property id, or the address as it appears in the case"), ticket_id: z.string().optional(), contractor_id: z.string().optional().describe("Panel id, or the contractor's name as it appears in the case"), scope: z.string(), estimated_cost_gbp: z.number(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record, or the history event in which the landlord approved (e.g. 'event 006')"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
   guard: async (i, ctx) => spendGuard(i.property_id, i.estimated_cost_gbp, i.approval_ref, ctx, i.emergency, i.emergency_justification),
   perform: async (i, ctx) => ctx.store.upsert("work_orders", rid("WO", ctx), { ...i, status: "instructed", ...stamp(ctx) }),
 };
 
 export const bookContractor: ToolDef = {
   name: "book_contractor", kind: "write", risk: "high",
-  description: "Book an approved contractor from the panel for a slot. Fails if the contractor is not on the panel.",
-  input: z.object({ contractor_id: z.string(), property_id: z.string(), slot: z.string().describe("ISO datetime or window"), scope: z.string(), estimated_cost_gbp: z.number().optional(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record that approves this spend"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
+  description: "Instruct or book a contractor for a slot or next available visit. Use a panel contractor id when a panel exists; when the case file is the system of record, use the contractor named in the case (id or name) and they count as approved.",
+  input: z.object({ contractor_id: z.string().describe("Panel contractor id, or the contractor's name exactly as it appears in the case"), property_id: z.string().describe("Property id, or the address as it appears in the case"), slot: z.string().describe("ISO datetime, window, or 'next available'"), scope: z.string(), estimated_cost_gbp: z.number().optional(), approval_ref: z.string().optional().describe("Id of a landlord_decisions record that approves this spend"), emergency: z.boolean().optional().describe("True only for make-safe work under the landlord's emergency authority"), emergency_justification: z.string().optional() }),
   guard: async (i, ctx) => {
     const c = await ctx.store.get("contractors", i.contractor_id);
     const panelKnown = (await ctx.store.list("contractors", 1)).length > 0;
@@ -143,8 +143,9 @@ async function doNotUse(propertyId: string, contractor: any, ctx: { store: any }
 
 async function spendGuard(propertyId: string, cost: number, approvalRef: string | undefined, ctx: { store: any }, emergency?: boolean, justification?: string): Promise<string | null> {
   if (approvalRef) {
+    if (/^event\s*\d+/i.test(approvalRef)) return null; // approval given in the case history
     const dec = await ctx.store.get("landlord_decisions", approvalRef).catch(() => null);
-    if (!dec) return `approval_ref ${approvalRef} does not match a recorded landlord decision; record the decision first or escalate`;
+    if (!dec) return `approval_ref ${approvalRef} does not match a recorded landlord decision or a history event; record the decision (record_landlord_decision) or cite the event, or escalate`;
     return null;
   }
   const prop = await ctx.store.get("properties", propertyId);
