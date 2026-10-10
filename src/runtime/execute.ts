@@ -5,14 +5,15 @@ import type { CaseRun } from "./wrapper.js";
 import type { Trace } from "./trace.js";
 
 /** Phase 1: actions that change state (tickets, bookings, work orders). Phase 2: communications and handovers, sent only once phase 1 results are known. */
-export const STATE_TOOLS = new Set(["create_ticket", "update_ticket", "create_work_order", "book_contractor", "assign_provider", "book_inspection", "request_quote", "set_hold", "close_case", "record_landlord_decision", "propose_action", "report_blocker"]);
-export const COMMS_TOOLS = new Set(["send_message", "escalate", "call_on_call_manager"]);
+export const STATE_TOOLS = new Set(["create_ticket", "update_ticket", "create_work_order", "book_contractor", "assign_provider", "book_inspection", "request_quote", "set_hold", "record_landlord_decision", "propose_action", "report_blocker"]);
+export const COMMS_TOOLS = new Set(["send_message", "escalate", "call_on_call_manager", "close_case"]); // close_case runs last, after messages
 
 /** Performs staged writes of one phase, in order. One execution per actionId; retries only on transient errors. */
 const createdIds = new WeakMap<CaseRun, Map<string, string>>();
 export async function executeStaged(run: CaseRun, ctx: ToolContext, trace: Trace, phase: "state" | "comms" | "all" = "all"): Promise<void> {
   const created = createdIds.get(run) ?? new Map<string, string>(); createdIds.set(run, created);
-  for (const a of run.staged) {
+  const order = phase === "comms" ? [...run.staged].sort((x, y) => Number(x.tool === "close_case") - Number(y.tool === "close_case")) : run.staged;
+  for (const a of order) {
     if (a.status !== "staged") continue;
     if (phase === "state" && !STATE_TOOLS.has(a.tool)) continue;
     if (phase === "comms" && !COMMS_TOOLS.has(a.tool)) continue;

@@ -66,7 +66,7 @@ export const bookContractor: ToolDef = {
 export const sendMessage: ToolDef = {
   name: "send_message", kind: "write", risk: "low",
   description: "Send a message to a tenant, landlord or contractor. Never commit the landlord to money or a legal position; never share more tenant data than the job needs. Refused when the body quotes a different property (PM-DATA-001), sends tenant contact details to anyone but the assigned contractor without consent (PM-PRIV-001), goes to a tenant at a property recorded as not tenanted (PM-OCC-001), or deducts from rent or bills the tenant without the route being approved (PM-LIAB-002).",
-  input: z.object({ to_party: z.enum(["tenant", "landlord", "contractor", "other"]), to_ref: z.string().describe("Record id or contact as held on file"), channel: z.enum(["email", "sms", "whatsapp", "portal"]), subject: z.string().optional(), body: z.string() }),
+  input: z.object({ to_party: z.enum(["tenant", "landlord", "contractor", "other"]), to_ref: z.string().describe("Record id or contact as held on file"), channel: z.enum(["email", "sms", "whatsapp", "portal"]), subject: z.string().optional(), body: z.string(), attachments: z.array(z.string()).optional().describe("Names of case attachments to send with the message, exactly as listed in the case (e.g. attachment-02-estimate.pdf)") }),
   guard: async (i, ctx) => ruleGuard("send_message", i, ctx) ?? (/\b((we|the landlord|your landlord) will (pay|refund|compensate|reimburse|reduce)|compensat\w*|rent (reduction|rebate|holiday)|section (8|21)|notice (to quit|seeking possession|to leave)|rent increase|evict\w*|you (must|have to|need to) (leave|move out|vacate))\b/i.test(i.body) ? "message commits the landlord to money or a legal position (compensation, rent change, notices, eviction)" : null),
   perform: async (i, ctx) => {
     const f = ctx.failures.take("send_message");
@@ -116,9 +116,9 @@ export const escalate: ToolDef = {
 export const assignProvider: ToolDef = {
   name: "assign_provider", kind: "write", risk: "low",
   description: "The agency's normal dispatch step ('Maintenance provider assigned'): assign the contractor who will attend, by panel id or by the name used in the case, once the landlord gate allows it. This is your job, not a human's; do not propose it for someone else. Follow it with the templated contractor and tenant messages. Allowed when the landlord approved (message or 'Landlord approval confirmed'), pre-authorised conditionally, or the agency raised the job; refused otherwise (PM-AUTH-001), when the landlord chose their own contractor or a self-fix (PM-AUTH-004), or when another provider is already on the job unless the scope says comparison quote or replacement (PM-AUTH-005).",
-  input: z.object({ provider: z.string().describe("Contractor name as used in the case, or panel id"), trade: z.string().optional(), property: z.string(), scope: z.string(), landlord_approval_ref: z.string().optional().describe("History event or decision id showing approval, or 'conditional: <wording>' or 'not required: <why>'") }),
-  guard: async (i, ctx) => ruleGuard("assign_provider", i, ctx),
-  perform: async (i, ctx) => ctx.store.upsert("assignments", rid("AS", ctx), { ...i, status: "assigned", ...stamp(ctx) }),
+  input: z.object({ provider: z.string().optional().describe("Contractor name as used in the case or panel id; leave empty to assign the agency's panel contractor for the trade, exactly as the platform's 'Maintenance provider assigned' step does"), trade: z.string().optional().describe("Trade needed, e.g. plumber, electrician, glazier, cleaner; required when no provider is named"), property: z.string(), scope: z.string(), landlord_approval_ref: z.string().optional().describe("History event or decision id showing approval, or 'conditional: <wording>' or 'not required: <why>'") }),
+  guard: async (i, ctx) => (!i.provider && !i.trade ? "name the provider or the trade to assign" : null) ?? ruleGuard("assign_provider", i, ctx),
+  perform: async (i, ctx) => ctx.store.upsert("assignments", rid("AS", ctx), { ...i, provider: i.provider ?? `panel ${i.trade}`, status: "assigned", ...stamp(ctx) }),
 };
 
 export const requestQuote: ToolDef = {
