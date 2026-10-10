@@ -11,7 +11,7 @@ import { sendMessage, validTwilioSignature } from "./transports/whatsapp.js";
 /**
  * Minimal HTTP service for the voice loop and inbound demo. No framework, runs anywhere, tunnel-friendly.
  *   GET  /api/cases/:id            handover pack (from the run output)
- *   POST /api/escalations          { case_id, to_number?, summary, decision_required, deadline, recipient_role?, property?, options?, ... } -> places the ElevenLabs outbound call
+ *   POST /api/escalations          P0 page: WhatsApp alert to the on-call manager + outbound call. { case_id, to_number?, summary, decision_required, deadline, recipient_role?, property?, options?, ... } -> places the ElevenLabs outbound call
  *   POST /api/escalations/preview  same body -> the call brief the agent would get (no call placed)
  *   POST /api/webhooks/elevenlabs  post-call webhook (HMAC verified) -> writes <OUT>/<case>/callback.json
  *   GET  /                         live board (public/board.html)
@@ -26,6 +26,51 @@ const PORT = Number(process.env.PORT ?? 8787);
 const LIVE_CASES = path.resolve("cases", "live");
 const LIVE_OUT = path.resolve(process.env.LIVE_OUT_DIR ?? "./out/live");
 const CASES_DIRS = [process.env.CASES_DIR, LIVE_CASES].filter(Boolean) as string[];
+
+/**
+ * P0 WhatsApp alert to the on-call property manager, sent alongside the call. The manager can reply with an
+ * option number; the reply is recorded in the case folder (whatsapp_reply.json). Pending alerts are kept per
+ * number so a reply maps back to its case.
+ */
+const PENDING_ALERTS = path.join(LIVE_OUT, "pending-alerts.json");
+function pendingAlerts(): Record<string, { case_id: string; dir: string; sent_at: string }> {
+  try { return JSON.parse(fs.readFileSync(PENDING_ALERTS, "utf8")); } catch { return {}; }
+}
+function alertText(b: Record<string, string>): string {
+  const options = b.options.split(/\s*(?=Option \d+:)/).map((o) => o.replace(/^Option (\d+):\s*/, "$1) ")).filter(Boolean).join("\n");
+  return [
+    `🚨 URGENT (P0): ${b.property}`,
+    b.issue,
+    `Why urgent: ${b.why_urgent}`,
+    `Risk if delayed: ${b.risk_if_delayed}`,
+    `Not yet confirmed: ${b.facts_uncertain}`,
+    `Options:\n${options}`,
+    `Recommended: ${b.recommended_option}, because ${b.recommendation_reason}.`,
+    `We are also calling you now. Reply with the option number to decide, or "call me" for a colleague. Ref ${b.case_id}`,
+  ].join("\n\n");
+}
+async function alertWhatsApp(body: any, dir: string) {
+  const to = process.env.ONCALL_WHATSAPP_NUMBER ?? body.to_number ?? process.env.ONCALL_PHONE_NUMBER;
+  if (!to || !process.env.TWILIO_WHATSAPP_FROM) return { sent: false, reason: "WhatsApp alert not configured" };
+  const result = await sendMessage("whatsapp", to, alertText(callBrief(body)));
+  if (result.ok) {
+    fs.mkdirSync(LIVE_OUT, { recursive: true });
+    fs.writeFileSync(PENDING_ALERTS, JSON.stringify({ ...pendingAlerts(), [to.replace(/\s/g, "")]: { case_id: String(body.case_id), dir, sent_at: new Date().toISOString() } }, null, 2));
+  }
+  return { sent: result.ok, to, ...result };
+}
+/** A manager's WhatsApp reply to an alert: "1".."4" picks an option, anything else is kept as free text. */
+async function recordAlertReply(from: string, text: string): Promise<boolean> {
+  const alert = pendingAlerts()[from.replace(/^whatsapp:/, "").replace(/\s/g, "")];
+  if (!alert) return false;
+  const option = text.trim().match(/^(?:option\s*)?([1-4])\b/i)?.[1] ?? null;
+  const reply = { received_at: new Date().toISOString(), channel: "whatsapp", from, text, chosen_option: option ?? "none", callback_requested: /call me|ring me|call back/i.test(text) };
+  fs.mkdirSync(alert.dir, { recursive: true });
+  fs.writeFileSync(path.join(alert.dir, "whatsapp_reply.json"), JSON.stringify(reply, null, 2));
+  console.log(`whatsapp reply for ${alert.case_id}: option=${reply.chosen_option}`);
+  await sendMessage("whatsapp", from, option ? `Recorded: Option ${option} for ${alert.case_id}. The team will action it and update you.` : `Noted for ${alert.case_id}: "${text.slice(0, 120)}". A colleague will follow up.`);
+  return true;
+}
 
 /** Writes the message as a live case and starts answering it. Returns the case id. */
 function receiveMessage(channel: string, from: string, body: string): string {
@@ -55,6 +100,7 @@ function pollWhatsApp() {
       for (const m of msgs.reverse()) {
         if (seen.has(m.sid) || m.direction !== "inbound" || Date.parse(m.date_created) < since - 5000) continue;
         seen.add(m.sid);
+        if (await recordAlertReply(m.from, m.body ?? "")) continue;
         const id = receiveMessage("whatsapp", m.from, m.body ?? "");
         void sendMessage("whatsapp", m.from, ackText(id));
       }
@@ -184,14 +230,16 @@ http.createServer(async (req, res) => {
       return json(res, 200, { case_id: m[1], answer });
     }
     if (req.method === "POST" && url.pathname === "/api/escalations/preview") {
-      return json(res, 200, callBrief(JSON.parse((await readBody(req)) || "{}")));
+      const brief = callBrief(JSON.parse((await readBody(req)) || "{}"));
+      return json(res, 200, { ...brief, whatsapp_text: alertText(brief) });
     }
     if (req.method === "POST" && url.pathname === "/api/escalations") {
       const body = JSON.parse((await readBody(req)) || "{}");
-      const result = await placeCall(body);
-      const dir = path.join(OUT, String(body.case_id ?? "unknown")); fs.mkdirSync(dir, { recursive: true });
-      fs.appendFileSync(path.join(dir, "calls.jsonl"), JSON.stringify({ ts: new Date().toISOString(), request: body, result }) + "\n");
-      return json(res, 200, result);
+      const dir = [OUT, LIVE_OUT].map((d) => path.join(d, String(body.case_id ?? "unknown"))).find((d) => fs.existsSync(d)) ?? path.join(OUT, String(body.case_id ?? "unknown"));
+      fs.mkdirSync(dir, { recursive: true });
+      const [result, whatsapp] = await Promise.all([placeCall(body), alertWhatsApp(body, dir).catch((e) => ({ sent: false, error: String(e) }))]);
+      fs.appendFileSync(path.join(dir, "calls.jsonl"), JSON.stringify({ ts: new Date().toISOString(), request: body, result, whatsapp }) + "\n");
+      return json(res, 200, { ...result, whatsapp });
     }
     if (req.method === "POST" && url.pathname === "/api/inbound") {
       const raw = await readBody(req);
