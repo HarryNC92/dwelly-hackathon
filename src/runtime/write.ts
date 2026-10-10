@@ -35,7 +35,7 @@ export function writeAnswer(dir: string, c: Case, res: Resolution | null, run: C
 
 ${statusBlock()}
 
-## ${c.kind === "question" ? "Answer" : "Decision"}
+${res.nextAction ? `## Next action\n${res.nextAction.type} → ${res.nextAction.recipient} (stage: ${res.nextAction.stage}; confidence ${res.nextAction.confidence}${res.rulesApplied?.length ? `; rules ${res.rulesApplied.join(", ")}` : ""})\n\n` : ""}## ${c.kind === "question" ? "Answer" : "Decision"}
 ${res.decision}
 
 ## Actions taken

@@ -46,6 +46,13 @@ export const ResolutionSchema = z.object({
   communications: z.array(z.object({ party: z.string(), channel: z.string(), gist: z.string() })),
   escalation: EscalationSchema,
   finalState: z.enum(["resolved", "scheduled", "awaiting_approval", "escalated", "closed_no_action", "blocked"]),
+  nextAction: z.object({
+    type: z.enum(["message_landlord", "message_tenant", "message_provider", "request_clarification", "assign_provider", "request_landlord_approval", "request_quote", "hold_waiting_for_landlord", "hold_waiting_for_tenant", "hold_waiting_for_provider", "escalate_human_review", "escalate_safety", "close_without_payment", "close_after_final_checks", "no_action_timer_not_expired"]),
+    recipient: z.enum(["landlord", "tenant", "provider", "human", "none"]),
+    stage: z.string().describe("Current workflow stage in the agency's terms"),
+    confidence: z.enum(["high", "medium", "low"]),
+  }).optional().describe("The one primary next action, in the triage vocabulary (docs/triage-rules.md); the staged actions carry it out"),
+  rulesApplied: z.array(z.string()).optional().describe("Rule ids that determined the decision, e.g. PM-AUTH-001"),
 });
 export type Resolution = z.infer<typeof ResolutionSchema>;
 
